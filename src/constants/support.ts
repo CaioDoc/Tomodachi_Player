@@ -1,10 +1,10 @@
 // src/constants/support.ts
 // Links do banner de apoio (Configurações) e do botão "Doar" no topo das seções.
 //
-//  SUPPORT_URL → seu checkout (Lemon Squeezy ou Paddle). Sem link, "Doar" abre o banner nas Configurações.
+//  SUPPORT_URL → página de doação (Buy Me a Coffee). Sem link, "Doar" abre o banner nas Configurações.
 //  GITHUB_URL  → página do projeto no GitHub. Sem link, o botão "Ver no GitHub" não aparece.
 
-export const SUPPORT_URL = '';
+export const SUPPORT_URL = 'https://buymeacoffee.com/tomodachiplayer';
 export const GITHUB_URL = 'https://github.com/CaioDoc/Tomodachi_Player';
 
 /** Abre um link no navegador do sistema */

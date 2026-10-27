@@ -10,6 +10,7 @@
 ![Plataforma](https://img.shields.io/badge/plataforma-Windows%2010%20%7C%2011-blue)
 ![Status](https://img.shields.io/badge/status-beta-orange)
 [![Licença](https://img.shields.io/github/license/CaioDoc/Tomodachi_Player)](LICENSE)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-apoiar-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/tomodachiplayer)
 
 [English](README.md) · Português
 
@@ -81,9 +82,16 @@ Os executáveis são gerados automaticamente pelo GitHub Actions direto do códi
 
 O projeto está andando rápido. Na fila:
 
-- Doações, para ajudar a manter o projeto no ar (em breve).
 - Atualização automática dentro do app.
 - Mais ajustes e correções toda semana, guiados pelo seu feedback.
+
+## Apoie o projeto
+
+O Tomodachi Player é gratuito e vai continuar sendo. Se ele deixa o seu dia melhor, você pode ajudar a mantê-lo no ar (e o café em dia):
+
+**[☕ Me pague um café](https://buymeacoffee.com/tomodachiplayer)**
+
+Dá para doar também por dentro do app: tem um botão **Doar** no topo de cada seção e nas Configurações.
 
 ## Feedback e erros
 

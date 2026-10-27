@@ -493,3 +493,9 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 - `.github/workflows/release.yml`: ao enviar para a main um package.json com versão nova (ex.: `1.5.6-beta`), o GitHub gera o instalador e a versão portátil num Windows limpo e cria a Release `v<versão>` (versões com "beta" saem como pré-lançamento).
 - Modelos de issue para erros e sugestões.
 - Versão passou para `1.5.5-beta` (package.json e Configurações → Sistema). O botão "Ver no GitHub" do banner agora abre o repositório.
+
+## Doações pelo Buy Me a Coffee (1.5.6-beta)
+
+- Os botões "Doar" (Mangás e Animes & Vídeos) e o "Fazer uma doação" do banner das Configurações abrem https://buymeacoffee.com/tomodachiplayer no navegador.
+- README (EN/PT) com a seção "Apoie o projeto" e o selo do Buy Me a Coffee.
+- `.github/FUNDING.yml`: mostra o botão "Sponsor" no repositório do GitHub.
