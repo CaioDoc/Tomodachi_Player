@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   Plus,
@@ -69,10 +69,36 @@ interface TabStripProps {
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onNewTab: () => void;
+  /** Arrastar e soltar: move a aba para a posição `toIndex` (índice antes de removê-la) */
+  onMoveTab?: (id: string, toIndex: number) => void;
 }
 
-export const TabStrip: React.FC<TabStripProps> = ({ tabs, activeTabId, onSelectTab, onCloseTab, onNewTab }) => {
+const TAB_MIME = 'application/x-tomodachi-tab';
+
+export const TabStrip: React.FC<TabStripProps> = ({ tabs, activeTabId, onSelectTab, onCloseTab, onNewTab, onMoveTab }) => {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  /** Onde a aba vai cair: índice de inserção (0…n) */
+  const [dropAt, setDropAt] = useState<number | null>(null);
+
+  const endDrag = () => {
+    setDragId(null);
+    setDropAt(null);
+  };
+
+  const dropIndexFor = (e: React.DragEvent<HTMLElement>, index: number) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return e.clientX < r.left + r.width / 2 ? index : index + 1;
+  };
+
+  // Rola a faixa quando arrasta perto das bordas
+  const autoScroll = (clientX: number) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (clientX < r.left + 40) el.scrollLeft -= 14;
+    else if (clientX > r.right - 40) el.scrollLeft += 14;
+  };
 
   // Mantém a aba ativa visível quando há muitas abas
   useEffect(() => {
@@ -94,10 +120,25 @@ export const TabStrip: React.FC<TabStripProps> = ({ tabs, activeTabId, onSelectT
         role="tablist"
         aria-label={t('Abas abertas')}
         onWheel={handleWheel}
+        onDragOver={(e) => {
+          if (!dragId) return;
+          e.preventDefault();
+          autoScroll(e.clientX);
+        }}
+        onDrop={(e) => {
+          if (!dragId) return;
+          e.preventDefault();
+          if (dropAt != null) onMoveTab?.(dragId, dropAt);
+          endDrag();
+        }}
         className="flex items-end gap-0.5 h-full overflow-x-auto overflow-y-hidden scrollbar-none min-w-0"
       >
-        {tabs.map((tab) => {
+        {tabs.map((tab, index) => {
           const isActive = tab.id === activeTabId;
+          const fromIndex = dragId ? tabs.findIndex((x) => x.id === dragId) : -1;
+          // Linha de inserção (não mostra quando soltar não muda nada)
+          const showBefore = dropAt === index && dragId && dropAt !== fromIndex && dropAt !== fromIndex + 1;
+          const showAfter = dropAt === tabs.length && index === tabs.length - 1 && dragId && fromIndex !== tabs.length - 1;
           return (
             <div
               key={tab.id}
@@ -106,6 +147,21 @@ export const TabStrip: React.FC<TabStripProps> = ({ tabs, activeTabId, onSelectT
               aria-selected={isActive}
               tabIndex={isActive ? 0 : -1}
               title={tab.title}
+              draggable={!!onMoveTab && tabs.length > 1}
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData(TAB_MIME, tab.id);
+                setDragId(tab.id);
+                onSelectTab(tab.id);
+              }}
+              onDragOver={(e) => {
+                if (!dragId) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const at = dropIndexFor(e, index);
+                if (at !== dropAt) setDropAt(at);
+              }}
+              onDragEnd={endDrag}
               onClick={() => onSelectTab(tab.id)}
               onMouseDown={(e) => {
                 // Clique do meio fecha a aba (como no navegador)
@@ -127,8 +183,10 @@ export const TabStrip: React.FC<TabStripProps> = ({ tabs, activeTabId, onSelectT
                 isActive
                   ? 'bg-surface text-fg shadow-[0_-1px_0_0_rgb(var(--c-border))]'
                   : 'text-fg-muted hover:bg-subtle/70 hover:text-fg'
-              }`}
+              } ${dragId === tab.id ? 'opacity-50' : ''}`}
             >
+              {showBefore && <span aria-hidden="true" className="absolute -left-[2px] top-1 bottom-1 w-[3px] rounded-full bg-accent pointer-events-none" />}
+              {showAfter && <span aria-hidden="true" className="absolute -right-[2px] top-1 bottom-1 w-[3px] rounded-full bg-accent pointer-events-none" />}
               <TabIcon type={tab.type} className={isActive ? 'text-accent' : 'opacity-80'} />
               <span className="truncate flex-1 leading-none">{tab.title}</span>
               <button

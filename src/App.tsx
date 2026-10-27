@@ -437,6 +437,21 @@ export const App: React.FC = () => {
 
   /* ─────────────────────────── Atalhos de teclado ─────────────────────────── */
 
+  /** Muda a aba de lugar (arrastar e soltar ou Ctrl+Shift+PageUp/PageDown) */
+  const moveTab = useCallback((id: string, toIndex: number) => {
+    setTabs((prev) => {
+      const from = prev.findIndex((x) => x.id === id);
+      if (from < 0) return prev;
+      let to = Math.max(0, Math.min(prev.length, toIndex));
+      if (to > from) to -= 1;
+      if (to === from) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
   const cycleTab = useCallback((dir: 1 | -1) => {
     const list = tabsRef.current;
     if (list.length < 2) return;
@@ -483,6 +498,15 @@ export const App: React.FC = () => {
         setSidebarCollapsed((c) => !c);
         return;
       }
+      if (e.shiftKey && (key === 'pageup' || key === 'pagedown')) {
+        const list = tabsRef.current;
+        const idx = list.findIndex((x) => x.id === activeTabIdRef.current);
+        if (idx >= 0) {
+          e.preventDefault();
+          moveTab(list[idx].id, key === 'pageup' ? idx - 1 : idx + 2);
+        }
+        return;
+      }
       if (/^[1-9]$/.test(key)) {
         const list = tabsRef.current;
         const n = Number(key);
@@ -497,7 +521,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [runShortcut]);
+  }, [runShortcut, moveTab]);
 
   // Atalhos encaminhados pelo processo principal quando o foco está dentro de um <webview>
   useEffect(() => {
@@ -672,6 +696,7 @@ export const App: React.FC = () => {
           onSelectTab={setActiveTabId}
           onCloseTab={handleCloseTab}
           onNewTab={() => openBrowserTab()}
+          onMoveTab={moveTab}
         />
       </TitleBar>
 

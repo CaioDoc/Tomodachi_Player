@@ -42,6 +42,8 @@ import {
   isScraperEnabled,
   nuvioCatalog,
   nuvioWorkUrl,
+  nuvioMeta,
+  nuvioLibraryItem,
   refreshNuvioRepos,
   removeNuvioRepo,
   setNuvioEnabled,
@@ -54,6 +56,8 @@ import {
   type NuvioType,
 } from '../api/nuvio';
 import { readLibrary } from '../utils/libraryStore';
+import { FavoriteTagModal } from './FavoriteTagModal';
+import { useBulkSelection, BulkFavoriteBar, heartButtonClass, heartSelectTitle } from './BulkFavorite';
 import { toast, confirmDialog } from './Feedback';
 import { t, tn } from '../i18n';
 import type { TabType } from '../types';
@@ -586,6 +590,34 @@ export const Catalog: React.FC<{
     });
   };
 
+  // Favoritar em lote: o coração marca a obra; "Favoritar" busca os detalhes de todas e abre as tags
+  const bulk = useBulkSelection<NuvioMetaPreview>();
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkItems, setBulkItems] = useState<any[] | null>(null);
+  const startBulkFavorite = async () => {
+    if (bulkBusy || !bulk.count) return;
+    setBulkBusy(true);
+    const picked = bulk.items;
+    const out: any[] = [];
+    let failed = 0;
+    for (let i = 0; i < picked.length; i += 4) {
+      const chunk = picked.slice(i, i + 4);
+      const res = await Promise.allSettled(chunk.map((m) => nuvioMeta(m.type, m.id, m.addonUrl)));
+      res.forEach((r, j) => {
+        if (r.status === 'fulfilled') out.push(nuvioLibraryItem(r.value));
+        else {
+          // Sem detalhes: salva o básico (os episódios aparecem ao abrir a obra)
+          const m = chunk[j];
+          failed++;
+          out.push({ source: 'nuvio', sourceName: 'Nuvio', url: nuvioWorkUrl(m.type, m.id), title: m.name, cover: m.poster || '', favorite: true, categories: [], chapters: [], nuvio: { type: m.type, imdbId: m.id, addonUrl: m.addonUrl } });
+        }
+      });
+    }
+    setBulkBusy(false);
+    if (failed) toast.info(t('Alguns detalhes não carregaram'), tn(failed, '{n} obra será salva só com o básico; os episódios aparecem ao abrir.', '{n} obras serão salvas só com o básico; os episódios aparecem ao abrir.'));
+    setBulkItems(out);
+  };
+
   const kinds: [Kind, string, React.ReactNode][] = [
     ['series', t('Séries'), <Tv key="s" size={13} />],
     ['movie', t('Filmes'), <Film key="m" size={13} />],
@@ -736,9 +768,14 @@ export const Catalog: React.FC<{
           </div>
         ) : (
           <div className="p-4 grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-            {items.map((m) => (
-              <button key={m.id} type="button" onClick={() => open(m)} className="group text-left cursor-pointer focus-visible:outline-none" title={m.name}>
-                <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-subtle border border-line-subtle group-hover:border-accent/60 group-focus-visible:ring-2 group-focus-visible:ring-accent/60 transition-colors">
+            {items.map((m) => {
+              const workUrl = nuvioWorkUrl(m.type, m.id);
+              const saved = inLibrary.has(workUrl);
+              const marked = !saved && bulk.has(workUrl);
+              return (
+              <div key={m.id} className="relative group/fav">
+              <button type="button" onClick={() => open(m)} className="group w-full text-left cursor-pointer focus-visible:outline-none" title={m.name}>
+                <div className={`relative aspect-[2/3] rounded-lg overflow-hidden bg-subtle border group-focus-visible:ring-2 group-focus-visible:ring-accent/60 transition-colors ${marked ? 'border-accent ring-2 ring-accent/50' : 'border-line-subtle group-hover:border-accent/60'}`}>
                   {m.poster ? (
                     <img src={m.poster} alt="" loading="lazy" referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" />
                   ) : (
@@ -751,16 +788,25 @@ export const Catalog: React.FC<{
                       <Star size={10} className="text-yellow-400" fill="currentColor" /> {m.imdbRating}
                     </span>
                   )}
-                  {inLibrary.has(nuvioWorkUrl(m.type, m.id)) && (
-                    <span className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center shadow" title={t('Na biblioteca')}>
-                      <Heart size={12} fill="currentColor" />
-                    </span>
-                  )}
                 </div>
                 <div className="mt-1.5 text-[12.5px] font-medium text-fg truncate group-hover:text-accent">{m.name}</div>
                 <div className="text-[11px] text-fg-muted truncate">{m.year || '—'}</div>
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => (saved ? open(m) : bulk.toggle(workUrl, m))}
+                aria-pressed={saved ? undefined : marked}
+                title={saved ? t('Na biblioteca') : heartSelectTitle(marked)}
+                aria-label={saved ? t('Na biblioteca') : heartSelectTitle(marked)}
+                className={`absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center shadow transition-all cursor-pointer ${heartButtonClass(saved, marked)} ${
+                  saved || marked || bulk.count > 0 ? '' : 'opacity-0 group-hover/fav:opacity-100 focus-visible:opacity-100'
+                }`}
+              >
+                <Heart size={13} fill={saved || marked ? 'currentColor' : 'none'} />
+              </button>
+              </div>
+              );
+            })}
             {loading &&
               Array.from({ length: items.length ? 6 : 18 }).map((_, i) => (
                 <div key={`sk-${i}`}>
@@ -783,6 +829,15 @@ export const Catalog: React.FC<{
           </div>
         )}
       </div>
+      <FavoriteTagModal
+        isOpen={!!bulkItems}
+        onClose={() => setBulkItems(null)}
+        manga={null}
+        bulk={bulkItems || []}
+        source="video"
+        onBulkSaved={() => bulk.clear()}
+      />
+      <BulkFavoriteBar count={bulk.count} busy={bulkBusy} onFavorite={() => void startBulkFavorite()} onClear={bulk.clear} />
     </div>
   );
 };

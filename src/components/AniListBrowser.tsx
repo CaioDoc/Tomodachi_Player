@@ -31,6 +31,7 @@ import type { TabType } from '../types';
 import type { LibraryItem } from './MihonLibrary';
 import { buildAnimeWatchWebUrl } from '../api/extensionRegistry';
 import { FavoriteTagModal } from './FavoriteTagModal';
+import { useBulkSelection, BulkFavoriteBar, heartButtonClass, heartSelectTitle } from './BulkFavorite';
 import { openWatchSources } from '../api/watchSources';
 import { t, tn } from '../i18n';
 
@@ -441,10 +442,19 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
     });
   };
 
+  const bulk = useBulkSelection<LibraryItem>();
+  const [bulkOpen, setBulkOpen] = useState(false);
+
+  /** Coração: obra já favoritada abre as tags; as outras são marcadas para favoritar em lote */
   const handleOpenFavorite = (media: AniListMedia, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFavoriteModalItem(convertMediaToLibraryItem(media));
-    setIsFavoriteModalOpen(true);
+    const item = convertMediaToLibraryItem(media);
+    if (getAnimeFavorite(media)?.favorite) {
+      setFavoriteModalItem(item);
+      setIsFavoriteModalOpen(true);
+      return;
+    }
+    bulk.toggle(`al:${media.id}`, item);
   };
 
   const handleOpenWebview = (media: AniListMedia) => {
@@ -780,12 +790,13 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
                 const favItem = getAnimeFavorite(anime);
                 const isFavorited = !!favItem?.favorite;
                 const mainTag = favItem?.categories?.[0];
+                const isMarked = !isFavorited && bulk.has(`al:${anime.id}`);
 
                 return (
                   <div
                     key={anime.id}
                     onClick={() => openTitle(anime)}
-                    className="group flex flex-col bg-surface hover:bg-subtle border border-line hover:border-accent rounded-md overflow-hidden cursor-pointer transition-all shadow-xs relative"
+                    className={`group flex flex-col bg-surface hover:bg-subtle border rounded-md overflow-hidden cursor-pointer transition-all shadow-xs relative ${isMarked ? 'border-accent ring-2 ring-accent/50' : 'border-line hover:border-accent'}`}
                   >
                     {/* Poster */}
                     <div className="w-full aspect-[2/3] bg-canvas relative overflow-hidden flex items-center justify-center">
@@ -830,18 +841,15 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
                       <button
                         type="button"
                         onClick={(e) => handleOpenFavorite(anime, e)}
-                        className={`absolute top-1.5 left-1.5 p-1.5 rounded-full transition-all shadow-md z-10 ${
-                          isFavorited
-                            ? 'bg-rose-600 text-white shadow-rose-900/50'
-                            : 'bg-black/60 text-fg-muted hover:text-white hover:bg-rose-600'
-                        }`}
+                        className={`absolute top-1.5 left-1.5 p-1.5 rounded-full transition-all shadow-md z-10 cursor-pointer ${heartButtonClass(isFavorited, isMarked)}`}
+                        aria-pressed={isFavorited ? undefined : isMarked}
                         title={
                           isFavorited
                             ? t('Favoritado em: {tags}', { tags: favItem?.categories?.join(', ') || '' })
-                            : t('Favoritar obra e organizar em tags')
+                            : heartSelectTitle(isMarked)
                         }
                       >
-                        <Heart size={12} fill={isFavorited ? 'currentColor' : 'none'} />
+                        <Heart size={12} fill={isFavorited || isMarked ? 'currentColor' : 'none'} />
                       </button>
 
                       {/* Botão de Webview no card */}
@@ -935,6 +943,18 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
           loadFavorites();
         }}
       />
+      <FavoriteTagModal
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        manga={null}
+        bulk={bulk.items}
+        source="video"
+        onBulkSaved={() => {
+          bulk.clear();
+          loadFavorites();
+        }}
+      />
+      <BulkFavoriteBar count={bulk.count} onFavorite={() => setBulkOpen(true)} onClear={bulk.clear} />
     </div>
   );
 };

@@ -28,6 +28,7 @@ import { buildAnimeWatchWebUrl } from '../api/extensionRegistry';
 import type { LibraryItem } from './MihonLibrary';
 import { getMangaList, getMangaDexCoverUrl, type MangaDexManga } from '../api/mangadex';
 import { FavoriteTagModal } from './FavoriteTagModal';
+import { useBulkSelection, BulkFavoriteBar, heartButtonClass, heartSelectTitle } from './BulkFavorite';
 import { openWatchSources } from '../api/watchSources';
 import { t } from '../i18n';
 
@@ -789,10 +790,19 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
     });
   };
 
-  const handleOpenFavoriteModal = (itemObj: LibraryItem, e: React.MouseEvent) => {
+  const bulk = useBulkSelection<LibraryItem>();
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const isFavoritedInLibrary = (itemObj: LibraryItem) => libraryMangas.some((m) => m.url === itemObj.url && m.favorite);
+
+  /** Coração: obra já favoritada abre as tags; as outras são marcadas para favoritar em lote */
+  const handleOpenFavoriteModal = (itemObj: LibraryItem, e: React.MouseEvent, favorited = isFavoritedInLibrary(itemObj)) => {
     e.stopPropagation();
-    setFavoriteManga(itemObj);
-    setIsFavoriteModalOpen(true);
+    if (favorited) {
+      setFavoriteManga(itemObj);
+      setIsFavoriteModalOpen(true);
+      return;
+    }
+    bulk.toggle(itemObj.url, itemObj);
   };
 
   const handleWatchVideoEpisode = (
@@ -990,15 +1000,11 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                     {/* Quick Favorite Action */}
                     <button
                       type="button"
-                      onClick={(e) => handleOpenFavoriteModal(m, e)}
-                      className={`absolute top-1.5 right-1.5 p-1.5 rounded-full transition-all shadow-md z-10 ${
-                        m.favorite
-                          ? 'bg-rose-600 text-white'
-                          : 'bg-black/60 text-fg-muted hover:text-white hover:bg-black/80'
-                      }`}
-                      title={m.favorite ? t('Gerenciar tags / Favorito') : t('Favoritar obra')}
+                      onClick={(e) => handleOpenFavoriteModal(m, e, !!m.favorite)}
+                      className={`absolute top-1.5 right-1.5 p-1.5 rounded-full transition-all shadow-md z-10 cursor-pointer ${heartButtonClass(!!m.favorite, bulk.has(m.url))}`}
+                      title={m.favorite ? t('Gerenciar tags / Favorito') : heartSelectTitle(bulk.has(m.url))}
                     >
-                      <Heart size={13} fill={m.favorite ? 'currentColor' : 'none'} />
+                      <Heart size={13} fill={m.favorite || bulk.has(m.url) ? 'currentColor' : 'none'} />
                     </button>
                   </div>
 
@@ -1133,19 +1139,15 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                           {/* Botão de Favoritar */}
                           <button
                             type="button"
-                            onClick={(e) => handleOpenFavoriteModal(itemObj, e)}
-                            className={`absolute top-1.5 left-1.5 p-1.5 rounded-full transition-all shadow-md z-10 ${
-                              isFavorited
-                                ? 'bg-rose-600 text-white'
-                                : 'bg-black/60 text-fg-muted hover:text-white hover:bg-rose-600'
-                            }`}
+                            onClick={(e) => handleOpenFavoriteModal(itemObj, e, isFavorited)}
+                            className={`absolute top-1.5 left-1.5 p-1.5 rounded-full transition-all shadow-md z-10 cursor-pointer ${heartButtonClass(isFavorited, bulk.has(itemObj.url))}`}
                             title={
                               isFavorited
                                 ? t('Favoritado em: {tags}', { tags: favItem?.categories?.join(', ') || '' })
-                                : t('Favoritar anime e adicionar em tags')
+                                : heartSelectTitle(bulk.has(itemObj.url))
                             }
                           >
-                            <Heart size={13} fill={isFavorited ? 'currentColor' : 'none'} />
+                            <Heart size={13} fill={isFavorited || bulk.has(itemObj.url) ? 'currentColor' : 'none'} />
                           </button>
 
                           {/* Botão rápido de Play no card */}
@@ -1258,10 +1260,10 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                       <button
                         type="button"
                         onClick={(e) => handleOpenFavoriteModal(itemObj, e)}
-                        className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-fg-muted hover:text-white hover:bg-black/80 transition-all shadow-md z-10"
-                        title={t('Favoritar obra')}
+                        className={`absolute top-1.5 right-1.5 p-1.5 rounded-full transition-all shadow-md z-10 cursor-pointer ${heartButtonClass(isFavoritedInLibrary(itemObj), bulk.has(itemObj.url))}`}
+                        title={isFavoritedInLibrary(itemObj) ? t('Gerenciar tags / Favorito') : heartSelectTitle(bulk.has(itemObj.url))}
                       >
-                        <Heart size={13} />
+                        <Heart size={13} fill={isFavoritedInLibrary(itemObj) || bulk.has(itemObj.url) ? 'currentColor' : 'none'} />
                       </button>
                     </div>
                     <div className="p-2">
@@ -1354,10 +1356,10 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                         <button
                           type="button"
                           onClick={(e) => handleOpenFavoriteModal(itemObj, e)}
-                          className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-fg-muted hover:text-white hover:bg-black/80 transition-all shadow-md z-10"
-                          title={t('Favoritar obra')}
+                          className={`absolute top-1.5 right-1.5 p-1.5 rounded-full transition-all shadow-md z-10 cursor-pointer ${heartButtonClass(isFavoritedInLibrary(itemObj), bulk.has(itemObj.url))}`}
+                          title={isFavoritedInLibrary(itemObj) ? t('Gerenciar tags / Favorito') : heartSelectTitle(bulk.has(itemObj.url))}
                         >
-                          <Heart size={13} />
+                          <Heart size={13} fill={isFavoritedInLibrary(itemObj) || bulk.has(itemObj.url) ? 'currentColor' : 'none'} />
                         </button>
                       </div>
                       <div className="p-2">
@@ -1413,6 +1415,18 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
           loadLibraryData();
         }}
       />
+      <FavoriteTagModal
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        manga={null}
+        bulk={bulk.items}
+        source={isVideo ? 'video' : 'manga'}
+        onBulkSaved={() => {
+          bulk.clear();
+          loadLibraryData();
+        }}
+      />
+      <BulkFavoriteBar count={bulk.count} onFavorite={() => setBulkOpen(true)} onClear={bulk.clear} />
     </div>
   );
 };

@@ -71,7 +71,8 @@ Os executáveis são gerados automaticamente pelo GitHub Actions direto do códi
 - Biblioteca de vídeos locais.
 
 **Geral**
-- Abas, para deixar várias obras, leitores e players abertos ao mesmo tempo.
+- Abas, para deixar várias obras, leitores e players abertos ao mesmo tempo. Arraste para mudar a ordem (ou use Ctrl+Shift+PageUp/PageDown).
+- Favoritar várias obras de uma vez: toque no coração de cada capa e clique em **Favoritar** na barra que aparece.
 - Navegador integrado com bloqueador de anúncios.
 - Sincronização com o AniList.
 - Importar e exportar backups compatíveis com o Mihon e o Aniyomi (`.tachibk`), para trazer a biblioteca do celular.

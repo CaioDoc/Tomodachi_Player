@@ -71,7 +71,8 @@ Every executable is built automatically by GitHub Actions straight from this rep
 - Local video library.
 
 **General**
-- Tabs, so you can keep several titles, readers and players open at once.
+- Tabs, so you can keep several titles, readers and players open at once. Drag them to reorder (or press Ctrl+Shift+PageUp/PageDown).
+- Favorite several titles at once: tap the heart on each cover, then click **Favorite** in the bar that appears.
 - Built-in browser with an ad blocker.
 - AniList sync.
 - Import and export library backups compatible with Mihon and Aniyomi (`.tachibk`), so you can bring your phone library over.

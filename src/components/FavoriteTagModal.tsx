@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import type { LibraryItem } from './MihonLibrary';
 import { updateLibrary } from '../utils/libraryStore';
-import { t, tMaybe } from '../i18n';
+import { t, tn, tMaybe } from '../i18n';
+import { toast } from './Feedback';
 
 interface FavoriteTagModalProps {
   isOpen: boolean;
@@ -38,6 +39,9 @@ interface FavoriteTagModalProps {
   source?: 'manga' | 'video';
   /** Tags indicadas para a obra (as que já existem vêm marcadas; as novas aparecem como sugestão) */
   suggestedTags?: string[];
+  /** Favoritar várias obras de uma vez (as tags escolhidas são somadas às que cada obra já tem) */
+  bulk?: Array<NonNullable<FavoriteTagModalProps['manga']>>;
+  onBulkSaved?: (count: number) => void;
 }
 
 const DEFAULT_MANGA_CATEGORIES = ['Favoritos'];
@@ -60,7 +64,11 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
   onSaved,
   source = 'manga',
   suggestedTags,
+  bulk,
+  onBulkSaved,
 }) => {
+  const isBulk = !!bulk && bulk.length > 0;
+  if (isBulk && !manga) manga = bulk![0];
   const isVideo = source === 'video';
   const categoriesKey = isVideo ? 'video_categories' : 'manga_categories';
   const libraryKey = isVideo ? 'video_library' : 'manga_library';
@@ -113,15 +121,17 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
     const existingSuggested = (suggestedTags || [])
       .map((sug) => combined.find((c) => c.toLowerCase() === sug.toLowerCase()))
       .filter((c): c is string => !!c);
-    const initialTags = manga.categories && manga.categories.length > 0
+    const initialTags = isBulk
+      ? ['Favoritos']
+      : manga.categories && manga.categories.length > 0
       ? manga.categories.filter((c) => !EXCLUDED_LIBRARY_CATEGORIES.has(c.toLowerCase().trim()))
       : Array.from(new Set(['Favoritos', ...existingSuggested]));
     setSelectedTags(initialTags);
-    setIsFavorite(manga.favorite ?? true);
+    setIsFavorite(isBulk ? true : manga.favorite ?? true);
     setNewTagInput('');
     setTagError(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, manga, categoriesKey, libraryKey, defaultCategories]);
+  }, [isOpen, manga, isBulk, categoriesKey, libraryKey, defaultCategories]);
 
   if (!isOpen || !manga) return null;
 
@@ -159,7 +169,68 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
     } catch {}
   };
 
+  const sameWork = (it: LibraryItem, m: NonNullable<FavoriteTagModalProps['manga']>) =>
+    it.url === m.url || (String(it.title || '').toLowerCase() === m.title.toLowerCase() && (it.sourceName || it.source) === (m.sourceName || m.source));
+
+  const handleSaveBulk = async () => {
+    setSaving(true);
+    try {
+      const tags = selectedTags.length > 0 ? selectedTags : ['Favoritos'];
+      await updateLibrary(
+        source,
+        (library: LibraryItem[]) => {
+          const next = [...library];
+          const added: LibraryItem[] = [];
+          for (const m of bulk || []) {
+            const idx = next.findIndex((it) => sameWork(it, m));
+            if (idx >= 0) {
+              const prev = next[idx];
+              next[idx] = {
+                ...prev,
+                favorite: true,
+                categories: Array.from(new Set([...(prev.categories || []), ...tags])),
+                cover: prev.cover || m.cover || '',
+              };
+            } else {
+              added.push({
+                ...(m as any),
+                source: m.source || (isVideo ? 'anilist' : 'extension'),
+                sourceName: m.sourceName || m.source || (isVideo ? 'Vídeos & Animations' : 'Extensão'),
+                author: m.author || '',
+                description: m.description || '',
+                genres: m.genres || [],
+                status: m.status ?? 1,
+                cover: m.cover || '',
+                dateAdded: Date.now(),
+                favorite: true,
+                categories: tags,
+                chapters: m.chapters || [],
+                totalChapters: m.chapters?.length || 0,
+                readChapters: 0,
+              } as LibraryItem);
+            }
+          }
+          return [...added, ...next];
+        },
+        { categories: allCategories }
+      );
+      try {
+        localStorage.setItem(categoriesKey, JSON.stringify(allCategories));
+      } catch {}
+      window.dispatchEvent(new CustomEvent('backup:applied', { detail: { source } }));
+      window.dispatchEvent(new CustomEvent(`${source}:library-updated`));
+      toast.success(tn(bulk?.length || 0, '{n} obra favoritada', '{n} obras favoritadas'));
+      onBulkSaved?.(bulk?.length || 0);
+      onClose();
+    } catch (err) {
+      console.error('Erro ao favoritar em lote:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSave = async () => {
+    if (isBulk) return handleSaveBulk();
     setSaving(true);
     try {
       const updatedTags = selectedTags.length > 0 ? selectedTags : ['Favoritos'];
@@ -275,7 +346,11 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
               <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
             </div>
             <span className="font-semibold text-sm text-fg">
-              {isVideo ? t('Favoritar Vídeo / Anime & Tags') : t('Favoritar Obra & Tags')}
+              {isBulk
+                ? tn(bulk!.length, 'Favoritar {n} obra', 'Favoritar {n} obras')
+                : isVideo
+                  ? t('Favoritar Vídeo / Anime & Tags')
+                  : t('Favoritar Obra & Tags')}
             </span>
           </div>
           <button
@@ -290,7 +365,23 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
 
         {/* Body */}
         <div className="p-5 space-y-4 text-xs text-fg-2 overflow-y-auto max-h-[75vh]">
-          {/* Card Preview */}
+          {isBulk ? (
+            <div className="flex items-center gap-3 p-3 bg-canvas border border-line rounded-lg">
+              <div className="flex -space-x-4 shrink-0">
+                {bulk!.slice(0, 5).map((m, i) => (
+                  <div key={m.url + i} className="w-10 h-14 rounded bg-subtle border-2 border-canvas overflow-hidden shadow" style={{ zIndex: 5 - i }}>
+                    {m.cover ? <img src={m.cover} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => ((e.target as HTMLElement).style.visibility = 'hidden')} /> : null}
+                  </div>
+                ))}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-semibold text-fg">{tn(bulk!.length, '{n} obra marcada', '{n} obras marcadas')}</h4>
+                <p className="text-[11px] text-fg-muted line-clamp-2 mt-0.5" title={bulk!.map((m) => m.title).join(', ')}>
+                  {bulk!.map((m) => m.title).join(', ')}
+                </p>
+              </div>
+            </div>
+          ) : (
           <div className="flex items-center gap-3 p-3 bg-canvas border border-line rounded-lg">
             <div className="w-12 h-16 rounded bg-subtle border border-line overflow-hidden shrink-0 flex items-center justify-center">
               {manga.cover ? (
@@ -325,7 +416,10 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
             </div>
           </div>
 
+          )}
+
           {/* Favorite Toggle Checkbox */}
+          {!isBulk && (
           <div
             onClick={() => setIsFavorite(!isFavorite)}
             className="flex items-center justify-between p-3 bg-canvas hover:bg-subtle/50 border border-line rounded-lg cursor-pointer transition-colors"
@@ -347,6 +441,7 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
               {isFavorite && <Check size={13} strokeWidth={3} />}
             </div>
           </div>
+          )}
 
           {/* Tags / Categories Selection */}
           <div className="space-y-2">
@@ -431,7 +526,7 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
 
         {/* Footer Actions */}
         <div className="px-5 py-3 bg-canvas border-t border-line flex items-center justify-between">
-          {manga.favorite ? (
+          {manga.favorite && !isBulk ? (
             <button
               type="button"
               disabled={saving}
@@ -460,7 +555,7 @@ export const FavoriteTagModal: React.FC<FavoriteTagModalProps> = ({
               className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-xs font-bold flex items-center gap-1.5 transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer"
             >
               <BookmarkCheck size={14} />
-              <span>{t('Salvar Favorito')}</span>
+              <span>{isBulk ? tn(bulk!.length, 'Favoritar {n} obra', 'Favoritar {n} obras') : t('Salvar Favorito')}</span>
             </button>
           </div>
         </div>

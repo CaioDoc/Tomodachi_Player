@@ -499,3 +499,11 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 - Os botões "Doar" (Mangás e Animes & Vídeos) e o "Fazer uma doação" do banner das Configurações abrem https://buymeacoffee.com/tomodachiplayer no navegador.
 - README (EN/PT) com a seção "Apoie o projeto" e o selo do Buy Me a Coffee.
 - `.github/FUNDING.yml`: mostra o botão "Sponsor" no repositório do GitHub.
+
+## Abas móveis e favoritar em lote (1.5.7-beta)
+
+- **Abas móveis:** arraste uma aba para mudar a ordem; uma linha rosa mostra onde ela vai cair, e a faixa rola sozinha perto das bordas. Pelo teclado: Ctrl+Shift+PageUp/PageDown move a aba ativa. A ordem fica salva na sessão.
+- **Favoritar em lote:** nos catálogos (Descobrir: Animes, Séries e Filmes; Navegar em addons; catálogos das extensões), o coração da capa agora marca a obra. Com uma ou mais marcadas aparece a barra "N obras marcadas · Favoritar · ✕"; "Favoritar" abre as tags uma vez só e salva todas. Esc desmarca tudo.
+  - Obra que já é favorita: o coração continua abrindo as tags dela.
+  - As tags escolhidas são somadas às que cada obra já tem.
+  - Séries e filmes do Nuvio/Stremio: os detalhes (episódios) de cada obra são buscados antes de salvar.
