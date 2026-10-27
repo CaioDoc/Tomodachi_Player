@@ -1,0 +1,31 @@
+# Dependências
+node_modules/
+
+# Builds (o executável vai para a página de Releases, não para o código)
+dist/
+dist-electron/
+release/
+*.exe
+*.blockmap
+
+# Arquivos locais e de teste
+_backup_*/
+scratch/
+/1.jpg
+/1.webp
+*.log
+.env
+.env.*
+
+# Artes originais em alta resolução (o app usa as versões de src/img/banner)
+src/img/characters/
+
+# Sistema e editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Cópia dos arquivos de .github para colar no site (pode apagar depois)
+_github/

@@ -1,0 +1,30 @@
+name: Bug report / Relatar um erro
+description: Something is not working / Algo não está funcionando
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version / Versão
+      description: Settings → System & Reset / Configurações → Sistema & Reset
+      placeholder: 1.5.5-beta
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do? / O que você fez?
+      placeholder: "1. Open Anime & Videos → Discover\n2. Click ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect? / O que esperava?
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened? / O que aconteceu?
+      description: Screenshots help a lot / Prints ajudam muito
+    validations:
+      required: true

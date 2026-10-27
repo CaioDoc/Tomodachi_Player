@@ -1,0 +1,16 @@
+// src/i18n/dictionary.ts
+// Junta as traduções de cada parte da interface: { 'texto em português': ['English', 'Español'] }
+import type { Parts } from './types';
+import app from './parts/app';
+import library from './parts/library';
+import player from './parts/player';
+import settings from './parts/settings';
+import sources from './parts/sources';
+import browser from './parts/browser';
+import core from './parts/core';
+import nuvio from './parts/nuvio';
+import help from './parts/help';
+import sources2 from './parts/sources2';
+import videos2 from './parts/videos2';
+
+export const DICTIONARY: Parts = Object.assign({}, core, app, library, player, settings, sources, browser, nuvio, help, sources2, videos2);

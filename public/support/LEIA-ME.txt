@@ -1,0 +1,2 @@
+Coloque aqui a imagem do cartao de apoio: banner.png (sugestao 1200 x 300 px).
+O link do checkout fica em src/constants/support.ts (SUPPORT_URL).
