@@ -1,0 +1,8 @@
+electron-builder: 25.1.8
+Instalador: Tomodachi-Player-Setup-1.5.8-beta.exe 154146098 bytes
+ADMIN /S (por usuário): código C0000005 instalado=False
+USUÁRIO COMUM /S (por usuário): código 00000000 instalado=False
+ADMIN /S /allusers: código 00000000 instalado=True
+PORTÁTIL: processos do app rodando=True
+--- falhas registradas ---
+Faulting application name: setup.exe_Tomodachi Player, version: 1.5.8.0, time stamp: 0x5c157f86 | Faulting module name: System.dll, version: 0.0.0.0, time stamp: 0x5c157efa | Exception code: 0xc0000005 | Fault offset: 0x00001581 | Faulting process id: 0x1D68
