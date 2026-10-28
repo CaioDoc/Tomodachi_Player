@@ -1,0 +1,84 @@
+# Teste de ponta a ponta: instala a última versão publicada num Windows limpo,
+# usa o app como um usuário e publica prints + relatório na branch e2e-results.
+name: E2E
+
+on:
+  push:
+    branches: [e2e]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  e2e-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Baixar o instalador da última versão
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url=$(gh api "repos/${{ github.repository }}/releases?per_page=1" --jq '.[0].assets[] | select(.name | test("Setup")) | .browser_download_url')
+          echo "Instalador: $url"
+          curl -sSL -o setup.exe "$url"
+          ls -la setup.exe
+
+      - name: Instalar em silêncio
+        shell: pwsh
+        run: |
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          Start-Process -FilePath .\setup.exe -ArgumentList '/S' -Wait
+          "Instalado em $($sw.Elapsed.TotalSeconds) s"
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Tomodachi Player.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { $exe = Get-ChildItem "$env:ProgramFiles" -Recurse -Filter 'Tomodachi Player.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 }
+          if (-not $exe) { throw 'executável não encontrado' }
+          "APP_EXE=$($exe.FullName)" >> $env:GITHUB_ENV
+          "APP_DIR=$($exe.DirectoryName)" >> $env:GITHUB_ENV
+          "Executável: $($exe.FullName)"
+
+      - name: Criar mídia de teste (vídeo + páginas)
+        shell: pwsh
+        run: |
+          $ff = Get-ChildItem "$env:APP_DIR\resources" -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1
+          $media = "$env:RUNNER_TEMP\tp-media"
+          New-Item -ItemType Directory -Force "$media\videos","$media\manga" | Out-Null
+          & $ff.FullName -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=30 -f lavfi -i sine=frequency=440 -t 20 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$media\videos\sample.mp4"
+          1..6 | ForEach-Object { & $ff.FullName -hide_banner -loglevel error -f lavfi -i "testsrc=size=800x1150" -frames:v 1 ("$media\manga\{0:D3}.png" -f $_) }
+          Get-ChildItem -Recurse $media | Select-Object FullName, Length
+          "MEDIA_DIR=$media" >> $env:GITHUB_ENV
+
+      - name: Instalar Playwright
+        run: npm i --no-save --no-audit --no-fund playwright@1.49.1
+
+      - name: Rodar o teste
+        run: node e2e/run.mjs
+        continue-on-error: true
+
+      - name: Juntar logs do app
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force e2e-out | Out-Null
+          Get-ChildItem "$env:APPDATA" -Directory | Where-Object { $_.Name -match 'Tomodachi|manga-video' } | ForEach-Object {
+            Get-ChildItem $_.FullName -Recurse -Filter '*.log' -ErrorAction SilentlyContinue | Copy-Item -Destination e2e-out -ErrorAction SilentlyContinue
+          }
+
+      - name: Publicar resultado na branch e2e-results
+        if: always()
+        shell: bash
+        run: |
+          cd e2e-out
+          git init -q -b e2e-results
+          git config user.name "e2e-bot"
+          git config user.email "e2e-bot@users.noreply.github.com"
+          git add -A
+          git commit -q -m "E2E ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" e2e-results
