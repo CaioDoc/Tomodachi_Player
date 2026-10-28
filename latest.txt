@@ -1,0 +1,7 @@
+electron-builder: 26.18.0
+Instalador: Tomodachi-Player-Setup-1.5.8-beta.exe 161764383 bytes
+ADMIN /S (por usuário): código 00000000 instalado=True
+USUÁRIO COMUM /S (por usuário): código 00000000 instalado=False
+ADMIN /S /allusers: código 00000000 instalado=True
+PORTÁTIL: processos do app rodando=True
+--- falhas registradas ---
