@@ -47,6 +47,7 @@ async function step(name, fn) {
     results.push({ name, ok: true, ms: Date.now() - t0, note: note || '' });
     log('  ✓', note || '');
   } catch (e) {
+    try { await shot(page, 'FALHA-' + name.replace(/[^a-z0-9]+/gi, '-').slice(0, 40)); } catch {}
     results.push({ name, ok: false, ms: Date.now() - t0, note: String(e?.message || e).split('\n')[0].slice(0, 300) });
     log('  ✗', e?.message);
   }
@@ -199,21 +200,32 @@ await step('Mangás · Explorar MangaDex', async () => {
   return `${n} capas na busca "Frieren"`;
 });
 
-await step('Mangás · detalhe da obra (MangaDex)', async () => {
-  await visible(page, 'text=/Frieren/i').first().click();
-  await sleep(7000);
+await step('Mangás · detalhe e leitura (MangaDex)', async () => {
+  await visible(page, 'text=/Sousou no Frieren$/i').first().click().catch(() => visible(page, 'text=/Frieren/i').first().click());
+  await sleep(8000);
   await shot(page, 'mangadex-detalhe');
-  return 'abriu';
+  const caps = await page.locator('text=/CAPÍTULOS DISPONÍVEIS \\((\\d+)\\)/i').first().innerText().catch(() => '');
+  const chapterBtn = visible(page, 'button:has-text("Cap"), [role=button]:has-text("Cap")').first();
+  if (await chapterBtn.count()) {
+    await chapterBtn.click();
+    await sleep(10000);
+    await shot(page, 'mangadex-leitor');
+    const imgs = await page.locator('img >> visible=true').count();
+    return `${caps}; leitor abriu com ${imgs} imagens visíveis`;
+  }
+  return `${caps} (sem capítulo para abrir)`;
 });
 
 await step('Vídeo local · adicionar pasta e tocar', async () => {
   if (!MEDIA) throw new Error('sem pasta de mídia');
   await app.evaluate(({ dialog }, dir) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] });
-  }, path.join(MEDIA, 'videos'));
+  }, path.join(MEDIA, 'tp-videos'));
   await goSection('Animes & Vídeos');
   await goTab('Local');
   await visible(page, 'button:has-text("Adicionar Pastas")').click();
+  await visible(page, 'text=tp-videos').first().waitFor({ timeout: 30000 });
+  await visible(page, 'text=tp-videos').first().click();
   await visible(page, 'text=sample').first().waitFor({ timeout: 30000 });
   await shot(page, 'video-local-lista');
   await visible(page, 'text=sample').first().click();
@@ -317,6 +329,7 @@ await step('Idioma · English', async () => {
   await page.locator('button[aria-label="Idioma"]').first().click();
   await sleep(400);
   await page.locator('[role=listbox] button:has-text("English")').click();
+  await visible(page, 'button:has-text("Mudar idioma")').click();
   await page.waitForSelector('text=Settings', { timeout: 30000 });
   await sleep(2500);
   await shot(page, 'english-settings');

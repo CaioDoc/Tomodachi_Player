@@ -73,8 +73,8 @@ jobs:
         run: |
           $ff = Get-ChildItem "$env:APP_DIR\resources" -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1
           $media = "$env:RUNNER_TEMP\tp-media"
-          New-Item -ItemType Directory -Force "$media\videos","$media\manga" | Out-Null
-          & $ff.FullName -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=30 -f lavfi -i sine=frequency=440 -t 20 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$media\videos\sample.mp4"
+          New-Item -ItemType Directory -Force "$media\tp-videos","$media\manga" | Out-Null
+          & $ff.FullName -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=30 -f lavfi -i sine=frequency=440 -t 20 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$media\tp-videos\sample.mp4"
           1..6 | ForEach-Object { & $ff.FullName -hide_banner -loglevel error -f lavfi -i "testsrc=size=800x1150" -frames:v 1 ("$media\manga\{0:D3}.png" -f $_) }
           Get-ChildItem -Recurse $media | Select-Object FullName, Length
           "MEDIA_DIR=$media" >> $env:GITHUB_ENV
