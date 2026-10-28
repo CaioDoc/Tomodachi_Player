@@ -511,3 +511,9 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 ## Doações pelo Ko-fi (1.5.8-beta)
 
 - O Buy Me a Coffee foi trocado pelo Ko-fi: os botões "Doar", o "Fazer uma doação" do banner, o README (EN/PT) e o botão "Sponsor" do GitHub agora levam a https://ko-fi.com/tomodachiplayer.
+
+## Instalador corrigido + teste automático no Windows (1.5.9-beta)
+
+- **Instalador:** num Windows limpo (build 26100, a base do Windows 11 24H2), o `Setup.exe` fechava em 3 segundos com erro de memória (0xC0000005 no `System.dll` do NSIS) ao instalar só para o usuário. A causa era o NSIS antigo do electron-builder 25. Atualizado para o electron-builder 26.18, que instala normalmente (testado no GitHub Actions: por usuário e para todos).
+- **MangaDex:** a sinopse vinha com Markdown cru (`[nome](https://...)`); agora aparece só o texto, e no idioma do app quando o MangaDex tiver.
+- **Teste de ponta a ponta (branch `e2e`):** instala a última versão publicada num Windows limpo e usa o app com internet real — Descobrir (AniList e Cinemeta), busca, página da obra, "Onde assistir", favoritar em lote, instalar e navegar num addon, MangaDex, vídeo local, navegador, abas, Ctrl+K, Configurações, botão Doar, reabrir o app e trocar o idioma. Prints e relatório vão para a branch `e2e-results`.
