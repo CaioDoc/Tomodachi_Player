@@ -35,23 +35,38 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force e2e-out | Out-Null
-          $sw = [Diagnostics.Stopwatch]::StartNew()
-          $p = Start-Process -FilePath .\setup.exe -ArgumentList '/S' -Wait -PassThru
-          "Instalador terminou com código $($p.ExitCode) em $([int]$sw.Elapsed.TotalSeconds) s" | Tee-Object -FilePath e2e-out\install.txt
+          $log = 'e2e-out\install.txt'
+          $f = Get-Item .\setup.exe
+          "setup.exe: $($f.Length) bytes, SHA256 $((Get-FileHash $f).Hash)" | Tee-Object -FilePath $log
+          (Get-AuthenticodeSignature $f).Status | Out-String | Tee-Object -FilePath $log -Append
+          [Environment]::OSVersion | Out-String | Tee-Object -FilePath $log -Append
+          $tries = @(@('/S'), @('/S','/currentuser'), @('/S','/allusers'))
           $exe = $null
-          for ($i = 0; $i -lt 60 -and -not $exe; $i++) {
-            $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles","${env:ProgramFiles(x86)}" -Recurse -Filter 'Tomodachi Player.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $exe) { Start-Sleep -Seconds 3 }
+          foreach ($a in $tries) {
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            $p = Start-Process -FilePath $f.FullName -ArgumentList $a -Wait -PassThru
+            "Tentativa '$($a -join ' ')': código $($p.ExitCode) ($('{0:X8}' -f $p.ExitCode)) em $([int]$sw.Elapsed.TotalSeconds) s" | Tee-Object -FilePath $log -Append
+            for ($i = 0; $i -lt 20 -and -not $exe; $i++) {
+              $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles","${env:ProgramFiles(x86)}" -Recurse -Filter 'Tomodachi Player.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+              if (-not $exe) { Start-Sleep -Seconds 3 }
+            }
+            if ($exe) { break }
           }
-          "Tempo total até o .exe aparecer: $([int]$sw.Elapsed.TotalSeconds) s" | Tee-Object -FilePath e2e-out\install.txt -Append
-          Get-ChildItem "$env:LOCALAPPDATA\Programs" -ErrorAction SilentlyContinue | Out-String | Tee-Object -FilePath e2e-out\install.txt -Append
-          if (-not $exe) {
-            "Instalado não encontrado; usando a versão portátil" | Tee-Object -FilePath e2e-out\install.txt -Append
-            throw 'executável não encontrado'
+          "--- Eventos de erro de aplicativo (falhas) ---" | Tee-Object -FilePath $log -Append
+          Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001,1026} -MaxEvents 6 -ErrorAction SilentlyContinue | Format-List TimeCreated, Id, Message | Out-String -Width 400 | Tee-Object -FilePath $log -Append
+          if ($exe) {
+            "INSTALOU: $($exe.FullName)" | Tee-Object -FilePath $log -Append
+          } else {
+            "Instalador falhou; extraindo o app do instalador com 7-Zip para testar mesmo assim" | Tee-Object -FilePath $log -Append
+            $dir = "$env:RUNNER_TEMP\tp-extract"
+            7z x $f.FullName "-o$dir\nsis" -y | Out-Null
+            $pkg = Get-ChildItem "$dir\nsis" -Recurse -Filter 'app-64.7z' | Select-Object -First 1
+            7z x $pkg.FullName "-o$dir\app" -y | Out-Null
+            $exe = Get-Item "$dir\app\Tomodachi Player.exe"
           }
           "APP_EXE=$($exe.FullName)" >> $env:GITHUB_ENV
           "APP_DIR=$($exe.DirectoryName)" >> $env:GITHUB_ENV
-          "Executável: $($exe.FullName)" | Tee-Object -FilePath e2e-out\install.txt -Append
+          "Executável: $($exe.FullName)" | Tee-Object -FilePath $log -Append
 
       - name: Criar mídia de teste (vídeo + páginas)
         shell: pwsh
