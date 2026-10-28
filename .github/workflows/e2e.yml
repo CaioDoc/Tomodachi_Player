@@ -34,15 +34,24 @@ jobs:
       - name: Instalar em silêncio
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force e2e-out | Out-Null
           $sw = [Diagnostics.Stopwatch]::StartNew()
-          Start-Process -FilePath .\setup.exe -ArgumentList '/S' -Wait
-          "Instalado em $($sw.Elapsed.TotalSeconds) s"
-          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Tomodachi Player.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $exe) { $exe = Get-ChildItem "$env:ProgramFiles" -Recurse -Filter 'Tomodachi Player.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 }
-          if (-not $exe) { throw 'executável não encontrado' }
+          $p = Start-Process -FilePath .\setup.exe -ArgumentList '/S' -Wait -PassThru
+          "Instalador terminou com código $($p.ExitCode) em $([int]$sw.Elapsed.TotalSeconds) s" | Tee-Object -FilePath e2e-out\install.txt
+          $exe = $null
+          for ($i = 0; $i -lt 60 -and -not $exe; $i++) {
+            $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles","${env:ProgramFiles(x86)}" -Recurse -Filter 'Tomodachi Player.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $exe) { Start-Sleep -Seconds 3 }
+          }
+          "Tempo total até o .exe aparecer: $([int]$sw.Elapsed.TotalSeconds) s" | Tee-Object -FilePath e2e-out\install.txt -Append
+          Get-ChildItem "$env:LOCALAPPDATA\Programs" -ErrorAction SilentlyContinue | Out-String | Tee-Object -FilePath e2e-out\install.txt -Append
+          if (-not $exe) {
+            "Instalado não encontrado; usando a versão portátil" | Tee-Object -FilePath e2e-out\install.txt -Append
+            throw 'executável não encontrado'
+          }
           "APP_EXE=$($exe.FullName)" >> $env:GITHUB_ENV
           "APP_DIR=$($exe.DirectoryName)" >> $env:GITHUB_ENV
-          "Executável: $($exe.FullName)"
+          "Executável: $($exe.FullName)" | Tee-Object -FilePath e2e-out\install.txt -Append
 
       - name: Criar mídia de teste (vídeo + páginas)
         shell: pwsh
@@ -79,6 +88,7 @@ jobs:
           git init -q -b e2e-results
           git config user.name "e2e-bot"
           git config user.email "e2e-bot@users.noreply.github.com"
+          echo "run ${{ github.run_id }}" > run.txt
           git add -A
           git commit -q -m "E2E ${{ github.sha }}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" e2e-results
