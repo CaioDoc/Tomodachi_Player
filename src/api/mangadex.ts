@@ -1,7 +1,19 @@
 import axios from 'axios';
-import { t } from '../i18n';
+import { t, lang } from '../i18n';
 
 const BASE_URL = 'https://api.mangadex.org';
+
+/** Sinopses do MangaDex vêm em Markdown: mostra só o texto (links viram o nome, sem **, ---, etc.) */
+export function plainDescription(md: string): string {
+  return md
+    .replace(/\[([^\]]+)\]\((?:https?:\/\/|\/)[^)]*\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, '$1$2')
+    .replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|$)/g, '$1$2')
+    .replace(/^\s*(?:-{3,}|_{3,}|\*{3,})\s*$/gm, '')
+    .replace(/^#+\s*/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 export interface MangaDexManga {
   id: string;
@@ -45,7 +57,9 @@ export async function getMangaList(page: number = 1, limit: number = 24, query: 
       const titles = item.attributes?.title || {};
       const title = titles.en || Object.values(titles)[0] || t('Sem título');
       const descs = item.attributes?.description || {};
-      const description = descs.en || Object.values(descs)[0] || '';
+      const prefer = lang === 'pt-BR' ? ['pt-br', 'pt'] : lang === 'es' ? ['es-la', 'es'] : [];
+      const localDesc = prefer.map((k) => descs[k]).find(Boolean);
+      const description = plainDescription(String(localDesc || descs.en || Object.values(descs)[0] || ''));
 
       const coverRel = (item.relationships || []).find((r: any) => r.type === 'cover_art');
       const coverFileName = coverRel?.attributes?.fileName;
