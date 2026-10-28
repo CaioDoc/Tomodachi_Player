@@ -507,3 +507,7 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
   - Obra que já é favorita: o coração continua abrindo as tags dela.
   - As tags escolhidas são somadas às que cada obra já tem.
   - Séries e filmes do Nuvio/Stremio: os detalhes (episódios) de cada obra são buscados antes de salvar.
+
+## Doações pelo Ko-fi (1.5.8-beta)
+
+- O Buy Me a Coffee foi trocado pelo Ko-fi: os botões "Doar", o "Fazer uma doação" do banner, o README (EN/PT) e o botão "Sponsor" do GitHub agora levam a https://ko-fi.com/tomodachiplayer.

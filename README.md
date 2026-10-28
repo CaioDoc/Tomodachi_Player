@@ -10,7 +10,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue)
 ![Status](https://img.shields.io/badge/status-beta-orange)
 [![License](https://img.shields.io/github/license/CaioDoc/Tomodachi_Player)](LICENSE)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/tomodachiplayer)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/tomodachiplayer)
 
 English · [Português](README.pt-BR.md)
 
@@ -90,7 +90,7 @@ The project is moving fast. Next up:
 
 Tomodachi Player is free and always will be. If it makes your day better, you can help keep it alive (and keep the coffee coming):
 
-**[☕ Buy me a coffee](https://buymeacoffee.com/tomodachiplayer)**
+**[☕ Support us on Ko-fi](https://ko-fi.com/tomodachiplayer)**
 
 You can also donate from inside the app: there is a **Donate** button at the top of each section and in Settings.
 
