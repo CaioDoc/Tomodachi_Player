@@ -1,0 +1,91 @@
+# Diagnóstico do instalador: monta com o electron-builder atual e com o mais novo e
+# testa a instalação silenciosa como administrador e como usuário comum.
+name: Installer test
+
+on:
+  push:
+    branches: [e2e-installer]
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        builder: [current, latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci || npm install
+      - name: electron-builder mais novo
+        if: matrix.builder == 'latest'
+        run: npm i -D --no-audit --no-fund electron-builder@latest
+      - run: npm run build
+      - name: Empacotar
+        run: npx electron-builder --win nsis portable --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Testar instalação
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          $log = "out\${{ matrix.builder }}.txt"
+          "electron-builder: $(npx electron-builder --version)" | Tee-Object $log
+          $setup = Get-ChildItem release -Filter '*Setup*.exe' | Select-Object -First 1
+          "Instalador: $($setup.Name) $($setup.Length) bytes" | Tee-Object $log -Append
+          New-Item -ItemType Directory -Force C:\tptest | Out-Null
+          Copy-Item $setup.FullName C:\tptest\setup.exe
+          icacls C:\tptest /grant 'Everyone:(OI)(CI)RX' | Out-Null
+
+          function Find-App($root) { Get-ChildItem $root -Recurse -Filter 'Tomodachi Player.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 }
+
+          # 1) Administrador, por usuário
+          $p = Start-Process C:\tptest\setup.exe -ArgumentList '/S' -Wait -PassThru
+          $ok = [bool](Find-App "$env:LOCALAPPDATA\Programs")
+          "ADMIN /S (por usuário): código $('{0:X8}' -f $p.ExitCode) instalado=$ok" | Tee-Object $log -Append
+
+          # 2) Usuário comum (não administrador), por usuário
+          try {
+            $pw = ConvertTo-SecureString 'Tp!Teste-2026x' -AsPlainText -Force
+            New-LocalUser -Name tpuser -Password $pw -AccountNeverExpires -ErrorAction Stop | Out-Null
+            Add-LocalGroupMember -Group Users -Member tpuser -ErrorAction SilentlyContinue
+            $cred = New-Object System.Management.Automation.PSCredential('tpuser', $pw)
+            $p2 = Start-Process C:\tptest\setup.exe -ArgumentList '/S' -Credential $cred -LoadUserProfile -WorkingDirectory C:\tptest -Wait -PassThru
+            Start-Sleep 5
+            $ok2 = [bool](Find-App 'C:\Users\tpuser\AppData\Local\Programs')
+            "USUÁRIO COMUM /S (por usuário): código $('{0:X8}' -f $p2.ExitCode) instalado=$ok2" | Tee-Object $log -Append
+          } catch {
+            "USUÁRIO COMUM: não deu para testar: $($_.Exception.Message)" | Tee-Object $log -Append
+          }
+
+          # 3) Administrador, para todos
+          $p3 = Start-Process C:\tptest\setup.exe -ArgumentList '/S','/allusers' -Wait -PassThru
+          $ok3 = [bool](Find-App "$env:ProgramFiles")
+          "ADMIN /S /allusers: código $('{0:X8}' -f $p3.ExitCode) instalado=$ok3" | Tee-Object $log -Append
+
+          # 4) Portátil abre?
+          $port = Get-ChildItem release -Filter '*Portable*.exe' | Select-Object -First 1
+          $pp = Start-Process $port.FullName -PassThru
+          Start-Sleep 25
+          $alive = Get-Process -Name 'Tomodachi Player' -ErrorAction SilentlyContinue
+          "PORTÁTIL: processos do app rodando=$([bool]$alive)" | Tee-Object $log -Append
+          $alive | Stop-Process -Force -ErrorAction SilentlyContinue
+
+          "--- falhas registradas ---" | Tee-Object $log -Append
+          Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000} -MaxEvents 4 -ErrorAction SilentlyContinue | Where-Object { $_.Message -match 'setup|Tomodachi' } | ForEach-Object { ($_.Message -split "`n")[0..4] -join ' | ' } | Tee-Object $log -Append
+      - name: Publicar
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p out && cd out
+          git init -q -b r
+          git config user.name bot; git config user.email bot@users.noreply.github.com
+          git add -A; git commit -q -m r --allow-empty
+          for i in 1 2 3; do git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" r:installer-results-${{ matrix.builder }} && break; sleep 5; done
