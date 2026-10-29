@@ -12,7 +12,7 @@ import { startVideoServer, NEEDS_TRANSCODE } from './videoServer';
 import { registerMediaProtocol, getFfmpegPath } from './mediaProtocol';
 import { registerDownloadIpcHandlers } from './downloads';
 import { setupLogging } from './logger';
-import { setupUpdater } from './updater';
+import { setupUpdater, isNewer } from './updater';
 import { registerSuwayomiIpcHandlers, suwayomiAuthFor } from './suwayomi';
 import { registerMediaProbeIpc } from './mediaProbe';
 import { registerNuvioIpc, destroyNuvioHost } from './nuvio';
@@ -132,16 +132,37 @@ if (process.platform === 'win32') {
 
 // Uma única instância: abrir o atalho de novo só traz a janela existente para frente
 // (duas instâncias gravando a mesma biblioteca podiam perder dados).
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
+// Quem abre por último informa a versão e o caminho: se for uma versão MAIS NOVA instalada em outro
+// lugar, a janela antiga oferece fechar e abrir a nova (antes, a versão antiga ficava sempre na frente).
+const gotSingleInstanceLock = app.requestSingleInstanceLock({ version: app.getVersion(), exe: process.execPath });
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, _argv, _cwd, additionalData: any) => {
     const win = mainWindow;
     if (!win || win.isDestroyed()) return;
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
+    const other = additionalData && typeof additionalData === 'object' ? additionalData : null;
+    if (other?.exe && other?.version && other.exe !== process.execPath && isNewer(String(other.version), app.getVersion())) {
+      void dialog
+        .showMessageBox(win, {
+          type: 'question',
+          title: 'Tomodachi Player',
+          message: `Você abriu a versão ${other.version}, mas a ${app.getVersion()} já estava aberta.`,
+          detail: `Versão nova: ${other.exe}\nVersão aberta: ${process.execPath}\n\nDica: desinstale as cópias antigas para os atalhos abrirem sempre a versão atual.`,
+          buttons: ['Abrir a versão nova', 'Continuar nesta'],
+          defaultId: 0,
+          cancelId: 1,
+          noLink: true,
+        })
+        .then(({ response }) => {
+          if (response !== 0) return;
+          app.relaunch({ execPath: String(other.exe), args: [] });
+          app.quit();
+        });
+    }
   });
 }
 

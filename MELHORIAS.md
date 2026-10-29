@@ -542,3 +542,9 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 ## Aviso "Atualizado para a versão X" (1.6.2-beta)
 
 - Depois que o app se atualiza, aparece no canto "Atualizado para a versão X · Ver o que mudou" (some sozinho em 15 s). Também serve de primeira versão para testar a atualização automática de ponta a ponta (1.6.1 → 1.6.2).
+
+## Cópias antigas não "roubam" mais a janela (1.6.3-beta)
+
+- **Atualização automática testada de ponta a ponta:** num Windows limpo, a 1.6.1 instalada achou a 1.6.2 em 15 s, baixou sozinha e, em "Reiniciar e atualizar", instalou e abriu de novo já na 1.6.2.
+- **Duas cópias instaladas:** se uma versão mais nova é aberta enquanto uma mais antiga (de outra pasta) já está aberta, a antiga avisa e oferece fechar e abrir a nova. Antes a antiga só vinha para a frente, e parecia que a instalação nova não tinha funcionado.
+- **Configurações → Sistema → Atualizações:** mostra o caminho da cópia em uso ("Esta cópia está em: …").

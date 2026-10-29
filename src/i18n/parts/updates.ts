@@ -35,6 +35,7 @@ const parts: Parts = {
   ],
   'A versão {v} do Tomodachi Player saiu.': ['Tomodachi Player {v} is out.', 'Salió la versión {v} de Tomodachi Player.'],
   Depois: ['Later', 'Después'],
+  'Esta cópia está em:': ['This copy is at:', 'Esta copia está en:'],
   'Atualizado para a versão {v}': ['Updated to version {v}', 'Actualizado a la versión {v}'],
   'Ver o que mudou': ["See what's new", 'Ver qué cambió'],
 };

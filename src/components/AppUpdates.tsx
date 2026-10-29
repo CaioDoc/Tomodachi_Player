@@ -17,6 +17,7 @@ export interface UpdateState {
   notes?: string;
   error?: string;
   checkedAt?: number;
+  exe?: string;
 }
 
 const api = () => (window as any).electronAPI as
@@ -172,6 +173,11 @@ export const AppUpdatesCard: React.FC = () => {
         </div>
       )}
       {s.status === 'error' && s.error && <p className="text-[11px] text-fg-muted break-all">{s.error}</p>}
+      {s.exe && (
+        <p className="text-[11px] text-fg-muted break-all">
+          {t('Esta cópia está em:')} <span className="font-mono text-fg-2">{s.exe}</span>
+        </p>
+      )}
       <button type="button" onClick={() => void a.updaterOpenReleases?.()} className="text-[11.5px] text-accent hover:underline inline-flex items-center gap-1 cursor-pointer">
         <ExternalLink size={11} /> {t('Ver novidades de cada versão')}
       </button>

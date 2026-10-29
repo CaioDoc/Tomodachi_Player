@@ -31,6 +31,8 @@ export interface UpdateState {
   notes?: string;
   error?: string;
   checkedAt?: number;
+  /** Caminho do .exe em uso (para saber qual cópia está aberta) */
+  exe?: string;
 }
 
 const settingsFile = () => path.join(app.getPath('userData'), 'updater.json');
@@ -61,7 +63,7 @@ function detectMode(): UpdateMode {
   return 'manual';
 }
 
-let state: UpdateState = { status: 'idle', mode: 'manual', auto: true, current: app.getVersion() };
+let state: UpdateState = { status: 'idle', mode: 'manual', auto: true, current: app.getVersion(), exe: process.execPath };
 
 function broadcast() {
   for (const w of BrowserWindow.getAllWindows()) {
