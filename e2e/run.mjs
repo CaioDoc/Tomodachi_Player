@@ -256,7 +256,34 @@ await step('Fontes · instalar addon (Anime Kitsu, só catálogo)', async () => 
   return 'instalado';
 });
 
+await step('Descobrir · busca também nas fontes instaladas', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('Cowboy Bebop');
+  const sec = page.locator('section[aria-label="Resultados nas suas fontes"] >> visible=true').first();
+  await sec.waitFor({ timeout: 20000 });
+  await page.waitForFunction(() => !/buscando em/i.test(document.querySelector('section[aria-label="Resultados nas suas fontes"]')?.textContent || 'buscando em'), null, { timeout: 45000 }).catch(() => {});
+  await sleep(1500);
+  await shot(page, 'busca-nas-fontes');
+  const txt = (await sec.innerText()).replace(/\s+/g, ' ').slice(0, 160);
+  await input.fill('');
+  await sleep(800);
+  if (!/Anime Kitsu/.test(txt)) throw new Error('o addon não apareceu na busca: ' + txt);
+  return txt;
+});
+
+await step('Doar presente na Biblioteca de Mangás', async () => {
+  await goSection('Mangás & Comics');
+  await goTab('Biblioteca');
+  const n = await page.locator('button:has-text("Doar") >> visible=true').count();
+  await goSection('Animes & Vídeos');
+  if (!n) throw new Error('sem botão Doar');
+  return 'aparece';
+});
+
 await step('Fontes · Navegar no catálogo do addon', async () => {
+  await goTab('Fontes');
   await visible(page, 'button:has-text("Navegar")').last().click();
   await sleep(6000);
   await shot(page, 'navegar-addon');
