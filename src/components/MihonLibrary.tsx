@@ -24,7 +24,8 @@ import {
   Globe,
   LayoutGrid,
   Grid3x3,
-  List
+  List,
+  Tag
 } from 'lucide-react';
 import type { TabType } from '../types';
 import { getChapterPages } from '../api/mangadex';
@@ -46,9 +47,14 @@ import { FavoriteTagModal } from './FavoriteTagModal';
 import { PROGRESS_EVENT, mergeChapterProgress, updateChapterProgress, getProgressMap } from '../utils/progress';
 import { useIsTabActive } from '../context/TabContext';
 import { t, tn, tMaybe } from '../i18n';
+import { parseTerms, matchesAll, topTags } from '../utils/smartSearch';
+import { LIBRARY_SEARCH_EVENT, takePendingLibrarySearch } from '../api/discoverSearch';
 
 /** Exibe o nome de uma categoria; a categoria padrão salva ('Favoritos') é traduzida só na tela. */
 const categoryLabel = (cat: string) => (cat === 'Favoritos' ? t('Favoritos') : cat);
+/** "Favoritos" é implícito (tudo na biblioteca é favorito): não vira aba nem filtro */
+const isImplicitCategory = (cat: string) => /^(favoritos|favorites|favoritas)$/i.test(String(cat || '').trim());
+const realCategories = (cats?: string[]) => (cats || []).filter((c) => c && typeof c === 'string' && c.trim() && !isImplicitCategory(c));
 
 export interface LibraryChapter {
   url: string;
@@ -129,7 +135,25 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'reading' | 'unread' | 'completed' | 'favorites'>('all');
+  const searchTerms = useMemo(() => parseTerms(searchQuery), [searchQuery]);
+  // Tag clicada na página de uma obra: abre a biblioteca já filtrando por ela
+  useEffect(() => {
+    const pending = takePendingLibrarySearch(source);
+    if (pending) {
+      setSelectedCategory('all');
+      setSearchQuery(pending);
+    }
+    const on = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      if (d.source !== source) return;
+      takePendingLibrarySearch(source);
+      setSelectedCategory('all');
+      setSearchQuery(String(d.query || ''));
+    };
+    window.addEventListener(LIBRARY_SEARCH_EVENT, on);
+    return () => window.removeEventListener(LIBRARY_SEARCH_EVENT, on);
+  }, [source]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'reading' | 'unread' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'default' | 'recent_read' | 'date_added' | 'unread_desc' | 'title_asc' | 'title_desc' | 'chapters_desc' | 'chapters_asc'>(() => {
     try {
       return (localStorage.getItem(`tp_library_sort_${source}`) as any) || 'default';
@@ -348,7 +372,7 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
     const counts: Record<string, number> = {};
     let uncategorized = 0;
     for (const item of items) {
-      const cats = (item.categories || []).filter((c) => c && typeof c === 'string' && c.trim());
+      const cats = realCategories(item.categories);
       if (cats.length === 0) {
         uncategorized++;
       } else {
@@ -366,7 +390,7 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
       .filter((item) => {
         // Categoria normalizada
         if (selectedCategory !== 'all') {
-          const itemCats = (item.categories || []).filter((c) => c && typeof c === 'string' && c.trim());
+          const itemCats = realCategories(item.categories);
           if (selectedCategory === '__uncategorized__') {
             if (itemCats.length > 0) return false;
           } else {
@@ -380,19 +404,12 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
         const total = item.chapters?.length || item.totalChapters || 0;
         const read = item.chapters?.filter((c) => c.read).length ?? item.readChapters ?? 0;
 
-        if (statusFilter === 'favorites' && !item.favorite) return false;
         if (statusFilter === 'reading' && (read === 0 || read >= total)) return false;
         if (statusFilter === 'unread' && read > 0) return false;
         if (statusFilter === 'completed' && (total === 0 || read < total)) return false;
 
-        // Busca
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          const matchTitle = item.title?.toLowerCase().includes(q);
-          const matchAuthor = item.author?.toLowerCase().includes(q);
-          const matchGenre = item.genres?.some((g) => g.toLowerCase().includes(q));
-          if (!matchTitle && !matchAuthor && !matchGenre) return false;
-        }
+        // Busca: vários termos separados por vírgula, todos precisam bater (título, autor, gêneros, tags)
+        if (searchTerms.length && !matchesAll(item as any, searchTerms)) return false;
 
         return true;
       })
@@ -418,7 +435,18 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
         }
         return 0;
       });
-  }, [items, selectedCategory, statusFilter, searchQuery, sortBy, lastActivity]);
+  }, [items, selectedCategory, statusFilter, searchTerms, sortBy, lastActivity]);
+
+  // Sugestões de tags a partir do que está na tela agora (respeita categoria, status e termos)
+  const tagSuggestions = useMemo(() => topTags(filteredItems as any, searchTerms, 16).filter((s) => s.count < filteredItems.length || filteredItems.length <= 1), [filteredItems, searchTerms]);
+  const addSearchTerm = (tag: string) => {
+    setSearchQuery((q) => {
+      const terms = parseTerms(q);
+      if (terms.some((x) => x.toLowerCase() === tag.toLowerCase())) return q;
+      return [...terms, tag].join(', ');
+    });
+  };
+  const removeSearchTerm = (idx: number) => setSearchQuery((q) => parseTerms(q).filter((_, i) => i !== idx).join(', '));
 
   // Alternar lido/não lido de um capítulo
   const toggleChapterRead = (chapterUrl: string) => {
@@ -666,7 +694,8 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={isManga ? tn(items.length, 'Buscar em {n} mangá…', 'Buscar em {n} mangás…') : tn(items.length, 'Buscar em {n} anime…', 'Buscar em {n} animes…')}
+                placeholder={isManga ? t('Buscar por título, autor ou tags (ex.: Seinen, Monster)') : t('Buscar por título ou tags (ex.: Ação, Isekai)')}
+                title={t('Separe por vírgula para combinar: todas as palavras precisam bater')}
                 className="w-full h-8 bg-surface border border-line-subtle focus:border-accent rounded-md pl-8 pr-7 text-[12.5px] text-fg placeholder-fg-muted outline-none transition-colors"
               />
               {searchQuery && (
@@ -692,7 +721,6 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
                 <option value="reading">{isManga ? t('Lendo') : t('Assistindo')}</option>
                 <option value="unread">{isManga ? t('Não lidos') : t('Não assistidos')}</option>
                 <option value="completed">{t('Concluídos')}</option>
-                <option value="favorites">{t('Favoritos')}</option>
               </select>
 
               <select
@@ -752,7 +780,7 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
             </div>
           </div>
 
-          {(categories.length > 0 || uncategorizedCount > 0) && (
+          {(categories.some((c) => !isImplicitCategory(c)) || uncategorizedCount > 0) && (
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none" role="tablist" aria-label={t('Categorias')}>
               <button
                 type="button"
@@ -765,7 +793,7 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
               >
                 {t('Todas')} <span className="opacity-60 tabular-nums">{items.length}</span>
               </button>
-              {categories.map((cat, idx) => {
+              {categories.filter((cat) => !isImplicitCategory(cat)).map((cat, idx) => {
                 const count = categoryCounts[cat] || 0;
                 const isSelected = selectedCategory === cat;
                 return (
@@ -797,6 +825,34 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
                   {t('Sem categoria')} <span className="opacity-60 tabular-nums">{uncategorizedCount}</span>
                 </button>
               )}
+            </div>
+          )}
+
+          {(searchTerms.length > 0 || tagSuggestions.length > 0) && (
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none" aria-label={t('Tags')}>
+              <Tag size={12} className="text-fg-muted shrink-0" aria-hidden />
+              {searchTerms.map((term, i) => (
+                <button
+                  key={`term-${i}-${term}`}
+                  type="button"
+                  onClick={() => removeSearchTerm(i)}
+                  className="h-6 pl-2.5 pr-1.5 rounded-full text-[11.5px] font-medium whitespace-nowrap inline-flex items-center gap-1 bg-accent text-accent-fg cursor-pointer"
+                  title={t('Remover "{tag}" da busca', { tag: term })}
+                >
+                  {term} <X size={11} />
+                </button>
+              ))}
+              {tagSuggestions.map((s) => (
+                <button
+                  key={`sug-${s.tag}`}
+                  type="button"
+                  onClick={() => addSearchTerm(s.tag)}
+                  className="h-6 px-2.5 rounded-full text-[11.5px] whitespace-nowrap border border-line-subtle text-fg-muted hover:text-fg hover:border-accent/50 hover:bg-subtle cursor-pointer"
+                  title={t('Filtrar também por "{tag}"', { tag: s.tag })}
+                >
+                  {s.tag} <span className="opacity-60 tabular-nums">{s.count}</span>
+                </button>
+              ))}
             </div>
           )}
         </div>

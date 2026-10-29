@@ -56,6 +56,7 @@ import {
   type NuvioType,
 } from '../api/nuvio';
 import { readLibrary } from '../utils/libraryStore';
+import { parseGenreQuery } from '../utils/smartSearch';
 import { FavoriteTagModal } from './FavoriteTagModal';
 import { useBulkSelection, BulkFavoriteBar, heartButtonClass, heartSelectTitle } from './BulkFavorite';
 import { toast, confirmDialog } from './Feedback';
@@ -530,7 +531,11 @@ export const Catalog: React.FC<{
   };
 
   const type: NuvioType = kind === 'movie' ? 'movie' : 'series';
-  const effectiveGenre = kind === 'anime' ? 'Animation' : genre;
+  // Busca inteligente: "Drama, Crime" ou "Terror, casa" → gêneros conhecidos viram filtro, o resto é texto
+  const parsedQ = useMemo(() => parseGenreQuery(submitted, NUVIO_GENRES), [submitted]);
+  const searchText = parsedQ.genres.length ? parsedQ.text : submitted;
+  const queryGenres = parsedQ.genres.join('|');
+  const effectiveGenre = kind === 'anime' ? 'Animation' : genre || parsedQ.genres[0] || '';
 
   const load = useCallback(
     async (reset: boolean) => {
@@ -539,16 +544,24 @@ export const Catalog: React.FC<{
       setError(null);
       try {
         const skip = reset ? 0 : items.length;
-        const list = addonRef
-          ? await fetchAddonCatalog(addonRef, { search: submitted, genre: genre || undefined, skip })
-          : await nuvioCatalog(type, { search: submitted, genre: effectiveGenre || undefined, skip });
+        let list = addonRef
+          ? await fetchAddonCatalog(addonRef, { search: searchText, genre: genre || parsedQ.genres[0] || undefined, skip })
+          : await nuvioCatalog(type, { search: searchText, genre: effectiveGenre || undefined, skip });
+        // Vários gêneros (ou gênero + texto): o catálogo filtra um, o resto é filtrado aqui
+        const need = [...parsedQ.genres, ...(kind === 'anime' ? ['Animation'] : [])].map((g) => g.toLowerCase());
+        if (need.length && (searchText || parsedQ.genres.length > 1)) {
+          list = list.filter((m) => {
+            const gs = (m.genres || []).map((g) => String(g).toLowerCase());
+            return !gs.length || need.every((g) => gs.includes(g));
+          });
+        }
         if (id !== reqId.current) return;
         setItems((prev) => {
           const base = reset ? [] : prev;
           const seen = new Set(base.map((x) => x.id));
           return [...base, ...list.filter((x) => !seen.has(x.id))];
         });
-        setMore(!submitted && list.length > 0);
+        setMore(!searchText && list.length > 0);
       } catch (err: any) {
         if (id === reqId.current) setError(String(err?.message || err));
       } finally {
@@ -556,14 +569,14 @@ export const Catalog: React.FC<{
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [type, submitted, effectiveGenre, items.length, addonRef?.key, genre]
+    [type, searchText, queryGenres, effectiveGenre, items.length, addonRef?.key, genre]
   );
 
   useEffect(() => {
     setItems([]);
     void load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, submitted, effectiveGenre, addonRef?.key, genre]);
+  }, [type, searchText, queryGenres, effectiveGenre, addonRef?.key, genre]);
 
   useEffect(() => {
     const refresh = () =>

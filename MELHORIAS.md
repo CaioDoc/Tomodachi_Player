@@ -517,3 +517,15 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 - **Instalador:** num Windows limpo (build 26100, a base do Windows 11 24H2), o `Setup.exe` fechava em 3 segundos com erro de memória (0xC0000005 no `System.dll` do NSIS) ao instalar só para o usuário. A causa era o NSIS antigo do electron-builder 25. Atualizado para o electron-builder 26.18, que instala normalmente (testado no GitHub Actions: por usuário e para todos).
 - **MangaDex:** a sinopse vinha com Markdown cru (`[nome](https://...)`); agora aparece só o texto, e no idioma do app quando o MangaDex tiver.
 - **Teste de ponta a ponta (branch `e2e`):** instala a última versão publicada num Windows limpo e usa o app com internet real — Descobrir (AniList e Cinemeta), busca, página da obra, "Onde assistir", favoritar em lote, instalar e navegar num addon, MangaDex, vídeo local, navegador, abas, Ctrl+K, Configurações, botão Doar, reabrir o app e trocar o idioma. Prints e relatório vão para a branch `e2e-results`.
+
+## Busca por tags e "Talvez você goste" (1.6.0-beta)
+
+- **Biblioteca (Mangás e Animes):** a busca aceita vários termos separados por vírgula, e todos precisam bater: título, autor, gêneros ou suas tags (ex.: `Seinen, Monster`). Entende gêneros em PT/EN/ES (`Ação` acha `Action`). Embaixo aparecem os termos ativos (clique para tirar) e as tags mais comuns do que está na tela, já respeitando a categoria e o status escolhidos — clique para afunilar.
+- **Sem a aba "Favoritos":** tudo na biblioteca já é favorito, então a aba e o filtro de status "Favoritos" saíram. Obras só com essa categoria aparecem em "Sem categoria".
+- **Descobrir:** gêneros e tags do AniList viram filtros (`Seinen, Monster` = tag Seinen + texto "monster"); em Séries/Filmes, gêneros do Cinemeta (`Drama, Crime`). Uma linha mostra como a busca foi entendida, com cada termo removível.
+- **Tags clicáveis nas páginas das obras:** gêneros + as principais tags do AniList (sem spoilers). Em animes, séries e filmes, clicar abre o Descobrir buscando aquela tag; em mangás, filtra a sua biblioteca.
+- **"Talvez você goste":** carrossel embaixo dos episódios/capítulos.
+  - Animes e mangás: relações oficiais do AniList (continuação, anterior, história principal, paralela, spin-off, outra versão) primeiro, depois as recomendações da comunidade mais bem avaliadas.
+  - Séries e filmes: obras da mesma franquia (pelo título) e parecidas (gêneros em comum, nota e época próxima) no Cinemeta.
+  - Clicar abre a obra; mangás abrem direto no MangaDex.
+- **MangaDex:** quando a obra não tem capítulos, explica que obras licenciadas costumam ficar sem capítulos lá.

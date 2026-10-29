@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, 
   BookOpen, 
@@ -20,6 +20,10 @@ import {
 import { MangaReader } from './MangaReader';
 import type { SubTab } from '../types';
 import { t, tn } from '../i18n';
+import { MANGADEX_OPEN_EVENT, takePendingMangaDexOpen, type MangaDexOpenRequest } from '../api/mangaSearch';
+import { norm } from '../utils/smartSearch';
+import { MaybeYouLike, WorkTags, useRecommendations, type RecRequest } from './MaybeYouLike';
+import { openLibrarySearch } from '../api/discoverSearch';
 
 interface MangaDexProps {
   activeSubTab?: string;
@@ -88,6 +92,11 @@ export const MangaDex: React.FC<MangaDexProps> = ({
     }
   }, [currentSubTab.id, currentSubTab.type]);
 
+  // "Talvez você goste" na página da obra (AniList, pelo título)
+  const detailTitle: string = currentSubTab.type === 'detail' ? currentSubTab.data?.manga?.title || '' : '';
+  const recReq = useMemo<RecRequest | null>(() => (detailTitle ? { kind: 'anilist', type: 'MANGA', title: detailTitle } : null), [detailTitle]);
+  const recs = useRecommendations(recReq);
+
   // Load pages when opening reader sub-tab
   useEffect(() => {
     if (currentSubTab.type === 'reader' && currentSubTab.data?.chapterId) {
@@ -100,6 +109,37 @@ export const MangaDex: React.FC<MangaDexProps> = ({
         .finally(() => setLoadingPages(false));
     }
   }, [currentSubTab.id, currentSubTab.type]);
+
+  // Pedido para abrir uma obra pelo título (recomendações): busca e abre a melhor correspondência
+  useEffect(() => {
+    const openByTitle = async (req: MangaDexOpenRequest | null) => {
+      if (!req?.title) return;
+      setSearchInput(req.title);
+      setPage(1);
+      setQuery(req.title);
+      try {
+        const wanted = [req.title, ...(req.altTitles || [])].map(norm);
+        for (const q of [req.title, ...(req.altTitles || [])]) {
+          const data = await getMangaList(1, 10, q);
+          const best = data.list.find((m) => wanted.includes(norm(m.title))) || (q === req.title ? undefined : data.list[0]);
+          if (best) {
+            handleOpenManga(best);
+            return;
+          }
+        }
+      } catch {
+        /* fica na busca */
+      }
+    };
+    void openByTitle(takePendingMangaDexOpen());
+    const on = (e: Event) => {
+      takePendingMangaDexOpen();
+      void openByTitle((e as CustomEvent).detail);
+    };
+    window.addEventListener(MANGADEX_OPEN_EVENT, on);
+    return () => window.removeEventListener(MANGADEX_OPEN_EVENT, on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,15 +342,13 @@ export const MangaDex: React.FC<MangaDexProps> = ({
                 <h1 className="text-lg font-bold text-fg leading-snug">
                   {currentSubTab.data.manga.title}
                 </h1>
-                {currentSubTab.data.manga.tags && (
-                  <div className="flex flex-wrap gap-1">
-                    {currentSubTab.data.manga.tags.map((tag: string) => (
-                      <span key={tag} className="bg-subtle text-accent text-[10px] px-2 py-0.5 rounded border border-line">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <div className="-mt-3">
+                  <WorkTags
+                    tags={[...(currentSubTab.data.manga.tags || []), ...(recs.result?.tags || [])]}
+                    onPick={(tag) => openLibrarySearch('manga', tag)}
+                    hint={t('Ver mangás da sua biblioteca com esta tag')}
+                  />
+                </div>
                 {currentSubTab.data.manga.description && (
                   <p className="text-xs text-fg-muted leading-relaxed line-clamp-5 max-w-2xl mt-1">
                     {currentSubTab.data.manga.description}
@@ -333,8 +371,9 @@ export const MangaDex: React.FC<MangaDexProps> = ({
                 <span>{t('Carregando lista de capítulos...')}</span>
               </div>
             ) : chapters.length === 0 ? (
-              <div className="text-xs text-fg-muted py-4 text-center">
-                {t('Nenhum capítulo traduzido encontrado em PT/EN.')}
+              <div className="text-xs text-fg-muted py-4 text-center max-w-xl mx-auto leading-relaxed">
+                {t('Nenhum capítulo traduzido encontrado em PT/EN.')}{' '}
+                {t('Obras com publicação oficial costumam ficar sem capítulos no MangaDex. Tente pelas suas extensões ou veja as sugestões abaixo.')}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -361,6 +400,10 @@ export const MangaDex: React.FC<MangaDexProps> = ({
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="-mx-6">
+            <MaybeYouLike request={recReq} state={recs} />
           </div>
         </div>
       )}

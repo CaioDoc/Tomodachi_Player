@@ -43,6 +43,8 @@ import {
 import { readLibrary, updateLibrary } from '../utils/libraryStore';
 import { getProgressMap, updateChapterProgress, PROGRESS_EVENT } from '../utils/progress';
 import { FavoriteTagModal } from './FavoriteTagModal';
+import { MaybeYouLike, WorkTags, useRecommendations, type RecRequest } from './MaybeYouLike';
+import { openDiscoverSearch } from '../api/discoverSearch';
 import { StreamRunList } from './StreamRunList';
 import { openWatchSources } from '../api/watchSources';
 import { getResume, CONTINUE_EVENT, fmtClock } from '../utils/continueWatching';
@@ -250,6 +252,18 @@ export const NuvioDetailView: React.FC<Props> = ({ work, focusEpisode, onOpenTab
   }, [favOpen]);
   const suggestions = useMemo(() => (meta ? suggestNuvioTags(meta, existingCats) : []), [meta, existingCats]);
 
+  /* ── "Talvez você goste" ── */
+  // Filmes/séries (IMDb): Cinemeta. Animes de addons (Kitsu etc.): AniList pelo título.
+  const isImdb = !!meta && /^tt\d+$/.test(meta.id);
+  const recReq = useMemo<RecRequest | null>(() => {
+    if (!meta) return null;
+    if (isImdb) return { kind: 'cinemeta', meta: { id: meta.id, type: meta.type, name: meta.name, genres: meta.genres, year: meta.year } };
+    return { kind: 'anilist', type: 'ANIME', title: meta.name };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta?.id, meta?.name]);
+  const recs = useRecommendations(recReq);
+  const pickTag = (tag: string) => (isImdb ? openDiscoverSearch(meta?.type === 'movie' ? 'movie' : 'series', tag) : openDiscoverSearch('anilist', tag));
+
   /* ── render ── */
   if (!parsed) return <div className="p-8 text-fg-muted text-sm">{t('Obra inválida')}</div>;
 
@@ -316,15 +330,7 @@ export const NuvioDetailView: React.FC<Props> = ({ work, focusEpisode, onOpenTab
                 {meta.type === 'series' && <span>{tn(seasons.length, '{n} temporada', '{n} temporadas')}</span>}
               </div>
             )}
-            {meta?.genres?.length ? (
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {meta.genres.map((g) => (
-                  <span key={g} className="text-[11px] px-2 py-0.5 rounded-full bg-subtle border border-line-subtle text-fg-2">
-                    {g}
-                  </span>
-                ))}
-              </div>
-            ) : null}
+            <WorkTags tags={[...(meta?.genres || []), ...(recs.result?.tags || [])]} onPick={pickTag} />
             {meta?.description && <p className="mt-3 text-[13px] leading-relaxed text-fg-2 line-clamp-4 max-w-3xl">{meta.description}</p>}
             {meta?.cast?.length ? <p className="mt-2 text-[11.5px] text-fg-muted truncate">{t('Elenco: {names}', { names: meta.cast.slice(0, 5).join(', ') })}</p> : null}
 
@@ -459,6 +465,8 @@ export const NuvioDetailView: React.FC<Props> = ({ work, focusEpisode, onOpenTab
           </div>
         )}
       </div>
+
+      <MaybeYouLike request={recReq} state={recs} onOpenTab={onOpenTab} />
 
       {favItem && (
         <FavoriteTagModal

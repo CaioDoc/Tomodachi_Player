@@ -11,6 +11,10 @@ import { ContinueWatching } from './ContinueWatching';
 import { NUVIO_EVENT } from '../api/nuvio';
 import { videoSourceCounts } from '../api/sources';
 import { t } from '../i18n';
+import { DISCOVER_SEARCH_EVENT, takePendingDiscoverSearch } from '../api/discoverSearch';
+import { anilistTagNames, parseAniListQuery } from '../api/anilistTags';
+import { parseGenreQuery, parseTerms } from '../utils/smartSearch';
+import { NUVIO_GENRES } from '../api/nuvio';
 
 type OpenTabFn = (typeOrTab: any, title?: string, data?: any) => void;
 type Kind = 'anilist' | 'series' | 'movie';
@@ -59,13 +63,50 @@ export const DiscoverView: React.FC<{
     };
   }, []);
 
+  // Busca pedida de fora (tag clicada na página de uma obra)
+  useEffect(() => {
+    const apply = (d: { kind?: Kind; query?: string } | null) => {
+      if (!d) return;
+      if (d.kind === 'anilist' || d.kind === 'series' || d.kind === 'movie') setKind(d.kind);
+      setInput(d.query || '');
+      setQuery((d.query || '').trim());
+    };
+    apply(takePendingDiscoverSearch());
+    const on = (e: Event) => {
+      takePendingDiscoverSearch();
+      apply((e as CustomEvent).detail);
+    };
+    window.addEventListener(DISCOVER_SEARCH_EVENT, on);
+    return () => window.removeEventListener(DISCOVER_SEARCH_EVENT, on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Como a busca foi entendida (gêneros e tags viram filtros)
+  const [tagNames, setTagNames] = useState<string[]>([]);
+  useEffect(() => {
+    void anilistTagNames().then(setTagNames);
+  }, []);
+  const parts = useMemo(() => {
+    if (!query) return [];
+    return kind === 'anilist' ? parseAniListQuery(query, tagNames).parts : parseGenreQuery(query, NUVIO_GENRES).parts;
+  }, [query, kind, tagNames]);
+  const showParts = parts.length > 1 || parts.some((p) => p.kind !== 'text');
+  const removeTerm = (idx: number) => {
+    const next = parseTerms(input).filter((_, i) => i !== idx).join(', ');
+    setInput(next);
+    setQuery(next);
+  };
+
   // Busca com atraso curto enquanto digita
   useEffect(() => {
     const id = setTimeout(() => setQuery(input.trim()), 450);
     return () => clearTimeout(id);
   }, [input]);
 
-  const placeholder = useMemo(() => (kind === 'series' ? t('Buscar séries…') : kind === 'movie' ? t('Buscar filmes…') : t('Buscar animes…')), [kind]);
+  const placeholder = useMemo(
+    () => (kind === 'series' ? t('Buscar séries… (ex.: Crime, Drama)') : kind === 'movie' ? t('Buscar filmes… (ex.: Terror, Mistério)') : t('Buscar animes… (ex.: Seinen, Monster)')),
+    [kind]
+  );
 
   const kinds: [Kind, string, React.ReactNode][] = [
     ['anilist', t('Animes'), <Sparkles key="a" size={13} />],
@@ -146,6 +187,28 @@ export const DiscoverView: React.FC<{
           <button type="button" onClick={onGoToSources} className="h-7 px-3 rounded-md bg-accent text-accent-fg text-[12px] font-semibold cursor-pointer shrink-0">
             {t('Adicionar fontes')}
           </button>
+        </div>
+      )}
+
+      {showParts && (
+        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-line-subtle bg-surface/60 flex-shrink-0 overflow-x-auto scrollbar-none" aria-label={t('Filtros da busca')}>
+          <span className="text-[11.5px] text-fg-muted shrink-0">{t('Buscando por')}</span>
+          {parts.map((p, i) => (
+            <button
+              key={`${i}-${p.term}`}
+              type="button"
+              onClick={() => removeTerm(i)}
+              title={t('Remover "{tag}" da busca', { tag: p.term })}
+              className={`h-6 pl-2 pr-1.5 rounded-full text-[11.5px] whitespace-nowrap inline-flex items-center gap-1 cursor-pointer border ${
+                p.kind === 'text' ? 'border-line text-fg-2 bg-subtle' : 'border-accent/40 bg-accent/15 text-fg'
+              }`}
+            >
+              <span className="opacity-70">{p.kind === 'genre' ? t('Gênero') : p.kind === 'tag' ? t('Tag') : t('Texto')}</span>
+              <span className="font-medium">{p.value}</span>
+              <X size={11} className="opacity-70" />
+            </button>
+          ))}
+          <span className="text-[11px] text-fg-muted shrink-0 ml-1">{t('Separe por vírgula para combinar')}</span>
         </div>
       )}
 

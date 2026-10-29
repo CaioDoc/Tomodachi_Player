@@ -31,6 +31,7 @@ import type { TabType } from '../types';
 import type { LibraryItem } from './MihonLibrary';
 import { buildAnimeWatchWebUrl } from '../api/extensionRegistry';
 import { FavoriteTagModal } from './FavoriteTagModal';
+import { anilistTagNames, parseAniListQuery } from '../api/anilistTags';
 import { useBulkSelection, BulkFavoriteBar, heartButtonClass, heartSelectTitle } from './BulkFavorite';
 import { openWatchSources } from '../api/watchSources';
 import { t, tn } from '../i18n';
@@ -80,7 +81,7 @@ interface PageInfo {
 }
 
 const GRAPHQL_QUERY = `
-query ($page: Int, $perPage: Int, $search: String, $sort: [MediaSort], $format: MediaFormat, $genre: String) {
+query ($page: Int, $perPage: Int, $search: String, $sort: [MediaSort], $format: MediaFormat, $genres: [String], $tags: [String]) {
   Page(page: $page, perPage: $perPage) {
     pageInfo {
       hasNextPage
@@ -88,7 +89,7 @@ query ($page: Int, $perPage: Int, $search: String, $sort: [MediaSort], $format: 
       currentPage
       lastPage
     }
-    media(type: ANIME, search: $search, sort: $sort, format: $format, genre: $genre) {
+    media(type: ANIME, search: $search, sort: $sort, format: $format, genre_in: $genres, tag_in: $tags, isAdult: false) {
       id
       title {
         romaji
@@ -257,13 +258,23 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Busca inteligente: gêneros e tags do AniList viram filtros, o resto é texto
+  const [tagNames, setTagNames] = useState<string[]>([]);
+  useEffect(() => {
+    void anilistTagNames().then(setTagNames);
+  }, []);
+  const parsedKey = useMemo(() => JSON.stringify(parseAniListQuery(debouncedSearch, tagNames)), [debouncedSearch, tagNames]);
+  const parsedQuery = useMemo(() => JSON.parse(parsedKey) as ReturnType<typeof parseAniListQuery>, [parsedKey]);
+
   const fetchAnimes = useCallback(async () => {
     setLoading(true);
 
     let sort = ['TRENDING_DESC'];
     let format: string | undefined = undefined;
+    const text = parsedQuery.text;
+    const genres = Array.from(new Set([...parsedQuery.genres, ...(selectedGenre ? [selectedGenre] : [])]));
 
-    if (debouncedSearch) {
+    if (text) {
       sort = ['SEARCH_MATCH'];
     } else {
       switch (category) {
@@ -296,10 +307,11 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
           variables: {
             page,
             perPage: 24,
-            search: debouncedSearch || undefined,
+            search: text || undefined,
             sort,
             format,
-            genre: selectedGenre || undefined,
+            genres: genres.length ? genres : undefined,
+            tags: parsedQuery.tags.length ? parsedQuery.tags : undefined,
           },
         }),
       });
@@ -326,7 +338,7 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, category, selectedGenre, page]);
+  }, [parsedQuery, category, selectedGenre, page]);
 
   useEffect(() => {
     fetchAnimes();
@@ -661,7 +673,7 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
           </div>
         )}
 
-        {!debouncedSearch && (
+        {!parsedQuery.text && (
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"

@@ -13,5 +13,6 @@ import help from './parts/help';
 import sources2 from './parts/sources2';
 import videos2 from './parts/videos2';
 import bulk from './parts/bulk';
+import discover2 from './parts/discover2';
 
-export const DICTIONARY: Parts = Object.assign({}, core, app, library, player, settings, sources, browser, nuvio, help, sources2, videos2, bulk);
+export const DICTIONARY: Parts = Object.assign({}, core, app, library, player, settings, sources, browser, nuvio, help, sources2, videos2, bulk, discover2);

@@ -35,6 +35,8 @@ import { Download, CheckCircle, Trash2, X as XIcon, HardDriveDownload } from 'lu
 import { PROGRESS_EVENT, mergeChapterProgress, preserveChapterState, updateChapterProgress } from '../utils/progress';
 import { fetchChapterList } from '../api/chapterList';
 import { FavoriteTagModal } from './FavoriteTagModal';
+import { MaybeYouLike, WorkTags, useRecommendations, type RecRequest } from './MaybeYouLike';
+import { openLibrarySearch } from '../api/discoverSearch';
 import { workStatusLabel } from '../constants/labels';
 import { AniListLink } from './AniListPanel';
 import { t, tn, tMaybe } from '../i18n';
@@ -519,6 +521,14 @@ export const MangaDetailView: React.FC<MangaDetailViewProps> = ({
     if (ok > 0) toast.success(tn(ok, '{n} capítulo baixado', '{n} capítulos baixados'));
   };
 
+  // "Talvez você goste" e tags extras: AniList (mangá) pelo título
+  const recReq = useMemo<RecRequest | null>(
+    () => (manga?.title ? { kind: 'anilist', type: 'MANGA', title: manga.title, altTitles: (manga as any).altTitles } : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [manga?.title]
+  );
+  const recs = useRecommendations(recReq);
+
   const handleDeleteDownload = async (c: LibraryChapter) => {
     await deleteDownloadedChapter(c.url);
     toast.info(t('Download removido'), c.name || t('Capítulo {n}', { n: c.number }));
@@ -716,19 +726,14 @@ export const MangaDetailView: React.FC<MangaDetailViewProps> = ({
                 </div>
               )}
 
-              {/* Genres */}
-              {manga.genres && manga.genres.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {manga.genres.map((g, i) => (
-                    <span
-                      key={i}
-                      className="bg-canvas text-fg-muted px-2 py-0.5 rounded text-[10px] border border-line"
-                    >
-                      {g}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Gêneros e tags: clicar filtra a biblioteca de mangás por ela */}
+              <div className="-mt-3 mb-4">
+                <WorkTags
+                  tags={[...(manga.genres || []), ...(recs.result?.tags || [])]}
+                  onPick={(tag) => openLibrarySearch('manga', tag)}
+                  hint={t('Ver mangás da sua biblioteca com esta tag')}
+                />
+              </div>
 
               {/* Description */}
               {manga.description && (
@@ -1020,6 +1025,10 @@ export const MangaDetailView: React.FC<MangaDetailViewProps> = ({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="pt-5">
+        <MaybeYouLike request={recReq} state={recs} />
       </div>
 
       {/* Modal de Favoritos & Tags */}

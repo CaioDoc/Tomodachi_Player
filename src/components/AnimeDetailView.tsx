@@ -32,6 +32,8 @@ import { FavoriteTagModal } from './FavoriteTagModal';
 import { AniListLink } from './AniListPanel';
 import { workStatusLabel } from '../constants/labels';
 import { t } from '../i18n';
+import { MaybeYouLike, WorkTags, useRecommendations, type RecRequest } from './MaybeYouLike';
+import { openDiscoverSearch } from '../api/discoverSearch';
 
 type OpenTabFn = (type: any, title: string, data?: any) => void;
 
@@ -165,6 +167,16 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
   const watchedCount = episodes.filter((c) => c.read).length;
   const pct = episodes.length ? Math.round((watchedCount / episodes.length) * 100) : 0;
   const synopsis = stripHtml(anime.description || '');
+
+  // "Talvez você goste" + tags extras (AniList): pelo ID quando a obra veio do AniList, senão pelo título
+  const anilistId = Number((String(anime.url || '').match(/anilist\.co\/anime\/(\d+)/) || [])[1]) || undefined;
+  const recReq = useMemo<RecRequest | null>(
+    () => (anime?.title ? { kind: 'anilist', type: 'ANIME', id: anilistId, title: anime.title, altTitles: anime.altTitles } : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [anilistId, anime?.title]
+  );
+  const recs = useRecommendations(recReq);
+  const workTags = [...(anime.genres || []).filter((g) => g && g !== anime.sourceName), ...(recs.result?.tags || [])];
   const work = { url: anime.url, title: anime.title, sourceName: anime.sourceName, source: anime.source, chapters: sortedAsc };
 
   // Painel de Fontes (extensões + plugins do Nuvio) para este episódio
@@ -302,15 +314,7 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
               <AniListLink source="video" workUrl={anime.url} title={anime.title} inLibrary={inLibrary} />
             </div>
 
-            {anime.genres?.filter((g) => g !== anime.sourceName).length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-4">
-                {anime.genres.filter((g) => g !== anime.sourceName).map((g) => (
-                  <span key={g} className="px-2 py-0.5 rounded text-[11px] bg-subtle/80 text-fg-muted border border-line-subtle">
-                    {g}
-                  </span>
-                ))}
-              </div>
-            )}
+            <WorkTags tags={workTags} onPick={(tag) => openDiscoverSearch('anilist', tag)} />
 
             {synopsis && (
               <div className="mt-4 max-w-3xl">
@@ -470,6 +474,8 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
           </div>
         )}
       </div>
+
+      <MaybeYouLike request={recReq} state={recs} onOpenTab={onOpenTab} />
 
       <FavoriteTagModal
         isOpen={favoriteOpen}

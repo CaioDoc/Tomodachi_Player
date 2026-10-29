@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MangaDex } from './MangaDex';
+import { MANGADEX_OPEN_EVENT } from '../api/mangaSearch';
 import { NHentaiBrowser } from './NHentaiBrowser';
 import { ExtensionsHub } from './ExtensionsHub';
 import { BackupModal, type BackupModalMode } from './BackupModal';
@@ -72,6 +73,14 @@ export const MangasSection: React.FC<MangasSectionProps> = ({
       /* ignore */
     }
   };
+
+  // "Talvez você goste" de um mangá: abre a obra no MangaDex
+  useEffect(() => {
+    const on = () => setSource('mangadex');
+    window.addEventListener(MANGADEX_OPEN_EVENT, on);
+    return () => window.removeEventListener(MANGADEX_OPEN_EVENT, on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Somente extensões de MANGÁ aparecem como fontes aqui
   const activeExtension = useMemo(
