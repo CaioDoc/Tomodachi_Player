@@ -139,6 +139,7 @@ export async function malSearch(query: string, opts: { limit?: number; clientId?
   try {
     result = { success: true, via: 'jikan', items: await searchJikan(q, limit), clientIdRejected: clientIdRejected || undefined };
   } catch (err) {
+    writeLog('warn', 'mal', `Jikan falhou (${describe(err)})`);
     return { success: false, error: describe(err), clientIdRejected: clientIdRejected || undefined };
   }
   cache.set(key, { at: Date.now(), result });
