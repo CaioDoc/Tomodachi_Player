@@ -395,7 +395,7 @@ export async function nuvioMeta(type: NuvioType, imdbId: string, addonUrl?: stri
     const ordered = addonUrl ? [...candidates.filter((a) => a.url === addonUrl), ...candidates.filter((a) => a.url !== addonUrl)] : candidates;
     for (const a of ordered) {
       try {
-        m = (await fetchJson<{ meta?: any }>(`${a.base}/meta/${type}/${encodeURIComponent(imdbId)}.json`)).meta;
+        m = (await fetchJson<{ meta?: any }>(`${a.base}/meta/${addonTypeFor(a, 'meta', type)}/${encodeURIComponent(imdbId)}.json`)).meta;
         if (m) {
           source = a;
           break;
@@ -934,6 +934,15 @@ export function kitsuOnlyStreamAddons(type: string): StremioAddon[] {
   });
 }
 
+/** Tipo que o addon usa na URL: addons de anime (ex.: Kitsu) usam "anime" no lugar de série/filme */
+export function addonTypeFor(addon: StremioAddon, resource: string, type: string): string {
+  const r = addon.resources.find((x) => x.name === resource);
+  const types = (r && r.types) || addon.types || [];
+  if (!types.length || types.includes(type)) return type;
+  if ((type === 'series' || type === 'movie') && types.includes('anime')) return 'anime';
+  return type;
+}
+
 export function addonsFor(resource: string, type: string, id?: string): StremioAddon[] {
   const st = getNuvioState();
   if (!st.enabled) return [];
@@ -942,7 +951,7 @@ export function addonsFor(resource: string, type: string, id?: string): StremioA
     const r = a.resources.find((x) => x.name === resource);
     if (!r) return false;
     const types = r.types || a.types;
-    if (types.length && !types.includes(type)) return false;
+    if (types.length && !types.includes(type) && !((type === 'series' || type === 'movie') && types.includes('anime'))) return false;
     const prefixes = r.idPrefixes || a.idPrefixes;
     if (id && prefixes && prefixes.length && !prefixes.some((p) => id.startsWith(p))) return false;
     return true;
@@ -962,7 +971,7 @@ function streamQuality(text: string): string | undefined {
 
 /** Busca os links de um addon (diretos, externos e torrents) */
 export async function fetchAddonStreams(addon: StremioAddon, type: string, id: string): Promise<{ streams: NuvioStream[]; torrents: number }> {
-  const data = await fetchJson<{ streams?: any[] }>(`${addon.base}/stream/${type}/${encodeURIComponent(id)}.json`);
+  const data = await fetchJson<{ streams?: any[] }>(`${addon.base}/stream/${addonTypeFor(addon, 'stream', type)}/${encodeURIComponent(id)}.json`);
   let torrents = 0;
   const streams: NuvioStream[] = [];
   for (const s of Array.isArray(data?.streams) ? data.streams : []) {
@@ -1051,7 +1060,8 @@ export function addonCatalogs(): AddonCatalogRef[] {
   for (const a of st.addons) {
     if (!a.enabled) continue;
     for (const c of a.catalogs) {
-      if (c.type !== 'movie' && c.type !== 'series') continue;
+      // "anime" (ex.: Kitsu) entra como série; o tipo original continua sendo usado na URL do addon
+      if (c.type !== 'movie' && c.type !== 'series' && c.type !== 'anime') continue;
       const required = c.extra.filter((e) => e.isRequired).map((e) => e.name);
       if (required.some((n) => n !== 'search' && n !== 'genre')) continue;
       const onlySearch = required.includes('search');
@@ -1059,7 +1069,7 @@ export function addonCatalogs(): AddonCatalogRef[] {
         addon: a,
         catalog: c,
         key: `${a.url}|${c.type}|${c.id}`,
-        label: `${a.name} · ${c.name || c.id} (${c.type === 'movie' ? t('Filmes') : t('Séries')})${onlySearch ? ' · ' + t('só busca') : ''}`,
+        label: `${a.name} · ${c.name || c.id} (${c.type === 'movie' ? t('Filmes') : c.type === 'anime' ? t('Animes') : t('Séries')})${onlySearch ? ' · ' + t('só busca') : ''}`,
         searchable: c.extra.some((e) => e.name === 'search'),
         genres: c.extra.find((e) => e.name === 'genre')?.options,
       });
@@ -1078,12 +1088,13 @@ export async function fetchAddonCatalog(ref: AddonCatalogRef, opts: { search?: s
   if (opts.skip && !opts.search) extras.push(`skip=${opts.skip}`);
   const url = `${ref.addon.base}/catalog/${ref.catalog.type}/${encodeURIComponent(ref.catalog.id)}${extras.length ? '/' + extras.join('&') : ''}.json`;
   const data = await fetchJson<{ metas?: any[] }>(url);
-  const type = ref.catalog.type as NuvioType;
+  const catalogType: NuvioType = ref.catalog.type === 'movie' ? 'movie' : 'series';
   return (data.metas || [])
     .filter((m) => m && typeof m.id === 'string')
     .map((m) => ({
       id: m.id,
-      type,
+      // Itens de catálogos "anime" podem ser filmes ou séries
+      type: (m.type === 'movie' ? 'movie' : m.type === 'series' ? 'series' : catalogType) as NuvioType,
       name: String(m.name || ''),
       poster: m.poster || undefined,
       year: m.releaseInfo || m.year || undefined,

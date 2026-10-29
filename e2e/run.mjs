@@ -312,8 +312,8 @@ await step('Mangás · detalhe e leitura (MangaDex)', async () => {
   await sleep(8000);
   await shot(page, 'mangadex-detalhe');
   const caps = await page.locator('text=/CAPÍTULOS DISPONÍVEIS \\((\\d+)\\)/i').first().innerText().catch(() => '');
-  const chapterBtn = visible(page, 'button:has-text("Cap"), [role=button]:has-text("Cap")').first();
-  if (await chapterBtn.count()) {
+  const chapterBtn = visible(page, 'div.grid > div:has-text("Capítulo")').first();
+  if (!/\(0\)/.test(caps) && (await chapterBtn.count())) {
     await chapterBtn.click();
     await sleep(10000);
     await shot(page, 'mangadex-leitor');

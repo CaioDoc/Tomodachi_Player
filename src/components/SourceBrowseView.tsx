@@ -48,7 +48,7 @@ export const SourceBrowseView: React.FC<{ target: SourceBrowseTarget; onOpenTab?
   const tabs = useMemo(
     () =>
       catalogs.length
-        ? catalogs.map((c) => ({ id: c.key, label: c.catalog.name || c.catalog.id, sub: c.catalog.type === 'movie' ? t('Filmes') : t('Séries'), searchable: c.searchable, kind: undefined as 'series' | 'movie' | undefined }))
+        ? catalogs.map((c) => ({ id: c.key, label: c.catalog.name || c.catalog.id, sub: c.catalog.type === 'movie' ? t('Filmes') : c.catalog.type === 'anime' ? t('Animes') : t('Séries'), searchable: c.searchable, kind: undefined as 'series' | 'movie' | undefined }))
         : types.map((ty) => ({ id: ty, label: ty === 'movie' ? t('Filmes') : t('Séries'), sub: '', searchable: true, kind: ty as 'series' | 'movie' })),
     [catalogs, types]
   );
