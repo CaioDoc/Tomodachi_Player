@@ -4,10 +4,11 @@
 //  - addons com catálogo: usa a busca do addon; se o catálogo não tem busca, procura nas páginas dele;
 //  - addons só de links (Torrentio, Comet…) e plugins do Nuvio: não têm catálogo, então a obra é
 //    encontrada pelo Cinemeta (IMDb), que é o que esses addons entendem. Ao abrir, "Assistir" usa eles.
+//  - MyAnimeList (aba Animes): pelo Jikan ou pela API oficial, se houver Client ID nas Configurações.
 // Fontes sem resultado não ocupam espaço; quando nada é encontrado, quem decide o aviso é o Descobrir.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Globe, Link2, Loader2, Package, Puzzle, Film } from 'lucide-react';
+import { ChevronDown, ChevronUp, Globe, Link2, Loader2, Package, Puzzle, Film, Star } from 'lucide-react';
 import { getAnimeSources, type InstalledExtension } from '../api/extensionRegistry';
 import {
   activeScrapers,
@@ -23,6 +24,7 @@ import {
   type StremioAddon,
 } from '../api/nuvio';
 import { norm } from '../utils/smartSearch';
+import { isMalSearchEnabled, malSearch, malTypeLabel, MAL_EVENT, openMalAnime } from '../api/myanimelist';
 import { t, tn } from '../i18n';
 
 type OpenTabFn = (typeOrTab: any, title?: string, data?: any) => void;
@@ -32,10 +34,11 @@ interface Hit {
   title: string;
   cover?: string;
   sub?: string;
+  score?: number;
   open: () => void;
 }
 
-type RowKind = 'site' | 'addon' | 'links';
+type RowKind = 'site' | 'addon' | 'links' | 'mal';
 
 interface Row {
   id: string;
@@ -48,8 +51,10 @@ interface Row {
 }
 
 export interface SourcesSearchStatus {
-  /** Quantas fontes participam da busca */
+  /** Quantas fontes instaladas participam da busca (sem contar o MyAnimeList) */
   sources: number;
+  /** O MyAnimeList também foi consultado */
+  mal: boolean;
   loading: boolean;
   hits: number;
 }
@@ -112,9 +117,11 @@ export const SourcesSearch: React.FC<{
     const on = () => setVersion((v) => v + 1);
     window.addEventListener('extensions:updated', on);
     window.addEventListener(NUVIO_EVENT, on);
+    window.addEventListener(MAL_EVENT, on);
     return () => {
       window.removeEventListener('extensions:updated', on);
       window.removeEventListener(NUVIO_EVENT, on);
+      window.removeEventListener(MAL_EVENT, on);
     };
   }, []);
 
@@ -135,13 +142,16 @@ export const SourcesSearch: React.FC<{
     const links = linkOnlyAddons(new Set(byAddon.keys()));
     const st = getNuvioState();
     const pluginCount = st.enabled ? new Set([...activeScrapers('movie'), ...activeScrapers('tv')].map((x) => x.scraper.id)).size : 0;
-    return { sites, addons, links, pluginCount };
+    return { sites, addons, links, pluginCount, mal: isMalSearchEnabled() };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
 
   // Em Séries/Filmes a grade principal já é o Cinemeta: a fileira "via Cinemeta" seria repetida
   const showLinksRow = kind === 'anilist' && (sources.links.length > 0 || sources.pluginCount > 0);
-  const total = sources.sites.length + sources.addons.length + (showLinksRow ? 1 : 0);
+  // MyAnimeList só tem animes: entra na aba Animes
+  const showMal = kind === 'anilist' && sources.mal;
+  const installedCount = sources.sites.length + sources.addons.length + (showLinksRow ? 1 : 0);
+  const total = installedCount + (showMal ? 1 : 0);
 
   useEffect(() => {
     const q = query.trim();
@@ -152,6 +162,7 @@ export const SourcesSearch: React.FC<{
     }
     const linkNames = [...sources.links.map((a) => a.name), ...(sources.pluginCount ? [tn(sources.pluginCount, '{n} plugin do Nuvio', '{n} plugins do Nuvio')] : [])];
     const initial: Row[] = [
+      ...(showMal ? [{ id: 'mal', name: 'MyAnimeList', kind: 'mal' as const, note: t('animes · nota do MAL'), status: 'loading' as const, hits: [] }] : []),
       ...sources.sites.map((e) => ({ id: `site:${e.pkg}`, name: e.name || e.sourceName, kind: 'site' as const, note: t('extensão'), status: 'loading' as const, hits: [] })),
       ...sources.addons.map((g) => ({
         id: `addon:${g.addon.url}`,
@@ -281,14 +292,43 @@ export const SourcesSearch: React.FC<{
         ]
       : [];
 
+    const malTasks = showMal
+      ? [
+          async () => {
+            try {
+              const res = await malSearch(q, 24);
+              if (!res.success) {
+                update('mal', { status: 'error', hits: [] });
+                return;
+              }
+              const hits: Hit[] = (res.items || []).map((m) => ({
+                key: `mal:${m.id}`,
+                title: m.title,
+                cover: m.cover,
+                score: m.score,
+                sub: [m.year, malTypeLabel(m.type)].filter(Boolean).join(' · '),
+                open: () => void openMalAnime(m, onOpenTab),
+              }));
+              update('mal', {
+                status: 'done',
+                hits: hits.slice(0, MAX_HITS),
+                note: res.clientIdRejected ? t('o MAL recusou o seu Client ID; usando o Jikan') : res.via === 'api' ? t('animes · API oficial') : t('animes · nota do MAL'),
+              });
+            } catch {
+              update('mal', { status: 'error', hits: [] });
+            }
+          },
+        ]
+      : [];
+
     // Até 4 buscas ao mesmo tempo
-    const queue = [...siteTasks, ...addonTasks, ...linkTasks];
+    const queue = [...malTasks, ...siteTasks, ...addonTasks, ...linkTasks];
     const worker = async () => {
       while (queue.length && reqId.current === id) await queue.shift()!();
     };
     void Promise.all([worker(), worker(), worker(), worker()]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, sources, showLinksRow]);
+  }, [query, sources, showLinksRow, showMal]);
 
   const active = !!query.trim() && total > 0;
   const loading = active ? rows.filter((r) => r.status === 'loading').length : 0;
@@ -297,9 +337,9 @@ export const SourcesSearch: React.FC<{
   const empty = rows.filter((r) => r.status !== 'loading' && r.hits.length === 0);
 
   useEffect(() => {
-    onStatus?.({ sources: active ? total : 0, loading: loading > 0 || (active && rows.length === 0), hits: hitCount });
+    onStatus?.({ sources: active ? installedCount : 0, mal: active && showMal, loading: loading > 0 || (active && rows.length === 0), hits: hitCount });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, total, loading, hitCount, rows.length]);
+  }, [active, total, installedCount, showMal, loading, hitCount, rows.length]);
 
   // Nada para mostrar: sem busca, sem fontes, ou terminou sem achar nada (o Descobrir mostra o aviso)
   if (!active || (loading === 0 && hitCount === 0)) return null;
@@ -330,7 +370,9 @@ export const SourcesSearch: React.FC<{
         title={loading === 0 && empty.length ? t('Sem resultados em: {names}', { names: emptyNames }) : undefined}
       >
         <Puzzle size={14} className="text-accent" />
-        <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-fg-muted">{t('Nas suas fontes')}</span>
+        <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+          {installedCount === 0 ? t('No MyAnimeList') : showMal ? t('Nas suas fontes e no MyAnimeList') : t('Nas suas fontes')}
+        </span>
         <span className="text-[11.5px] text-fg-muted">
           {hitCount > 0 && tn(hitCount, '{n} resultado', '{n} resultados') + ' · ' + tn(withHits.length, '{n} fonte', '{n} fontes')}
           {hitCount > 0 && loading > 0 && ' · '}
@@ -348,7 +390,9 @@ export const SourcesSearch: React.FC<{
             .map((r) => (
               <div key={r.id}>
                 <div className="flex items-center gap-1.5 mb-1.5 text-[12px] min-w-0">
-                  {r.kind === 'site' ? (
+                  {r.kind === 'mal' ? (
+                    <span className="h-3.5 px-1 rounded-[3px] bg-[#2e51a2] text-white text-[8.5px] font-black leading-[14px] shrink-0">MAL</span>
+                  ) : r.kind === 'site' ? (
                     <Globe size={12} className="text-fg-muted shrink-0" />
                   ) : r.kind === 'links' ? (
                     <Link2 size={12} className="text-fg-muted shrink-0" />
@@ -369,6 +413,11 @@ export const SourcesSearch: React.FC<{
                               <img src={h.cover} alt="" loading="lazy" referrerPolicy="no-referrer" className="w-full h-full object-cover" onError={(e) => ((e.target as HTMLElement).style.visibility = 'hidden')} />
                             ) : (
                               <Film size={20} className="text-fg-muted" />
+                            )}
+                            {h.score != null && (
+                              <span className="absolute top-1 left-1 px-1 py-px rounded bg-black/70 text-[10px] text-white inline-flex items-center gap-0.5 tabular-nums">
+                                <Star size={9} className="text-yellow-400" fill="currentColor" /> {h.score.toFixed(2)}
+                              </span>
                             )}
                           </div>
                           <div className="mt-1 text-[11.5px] text-fg leading-snug line-clamp-2 group-hover:text-accent">{h.title}</div>

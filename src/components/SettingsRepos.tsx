@@ -27,6 +27,7 @@ import { DEFAULT_REPOS, type DefaultRepo } from '../api/defaultRepos';
 import { fetchRepository } from '../api/repositories';
 import { DEFAULT_API_KEY, getNHentaiToken, setNHentaiToken } from '../api/nhentai';
 import { AniListAccountCard } from './AniListPanel';
+import { MyAnimeListCard } from './MyAnimeListCard';
 import { ThemeEditorTab } from './ThemeEditorTab';
 import { SuwayomiSetupPanel } from './SuwayomiSetup';
 import { LanguageDropdown } from './LanguagePicker';
@@ -384,6 +385,7 @@ export const SettingsRepos: React.FC = () => {
       {activeSection === 'accounts' && (
         <div className="max-w-2xl space-y-4">
           <AniListAccountCard />
+          <MyAnimeListCard />
           <div className="p-5 bg-surface rounded-lg border border-line space-y-4 shadow-sm">
             <div className="flex items-center justify-between pb-3 border-b border-line">
               <div className="flex items-center gap-2">

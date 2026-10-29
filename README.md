@@ -75,6 +75,7 @@ Every executable is built automatically by GitHub Actions straight from this rep
 - Favorite several titles at once: tap the heart on each cover, then click **Favorite** in the bar that appears.
 - Built-in browser with an ad blocker.
 - AniList sync.
+- **MyAnimeList in search:** Discover → Anime also shows MyAnimeList results, no key needed (you can use the official API with your own Client ID in Settings → Accounts).
 - **Smart search:** combine words and tags with commas (e.g. `Seinen, Monster`). It works in your library and in Discover, where genres and AniList tags become filters.
 - **You might also like:** every title page shows sequels, prequels, spin-offs and similar titles, and its tags are clickable to find more like it.
 - Import and export library backups compatible with Mihon and Aniyomi (`.tachibk`), so you can bring your phone library over.

@@ -562,3 +562,13 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
   - fontes sem resultado não ocupam mais espaço;
   - se o AniList/Cinemeta não acha nada, a grade some e os resultados das fontes ocupam a tela, com o aviso "nada no AniList para essa busca";
   - se nada é achado em lugar nenhum, aparece um aviso só, com "Buscar em Séries/Filmes/Animes", "Limpar busca" e "Adicionar fontes".
+
+## MyAnimeList na busca (1.6.6-beta)
+
+- **Descobrir → Animes:** a busca também mostra os resultados do **MyAnimeList**, com a nota do MAL em cada capa.
+  - Funciona sem configurar nada, pelo **Jikan** (espelho público do MAL).
+  - Ao abrir um resultado, o app acha a mesma obra no AniList e abre a página completa (episódios, "Assistir", "Talvez você goste"); se ela não existir no AniList, abre a página do MAL no navegador do app.
+- **Configurações → Contas → MyAnimeList:** liga/desliga a busca no MAL e aceita (opcional) um **Client ID** para usar a API oficial.
+  - O Client ID fica guardado criptografado no computador (nunca no código).
+  - Se o MAL recusar o Client ID, a busca continua pelo Jikan e avisa.
+  - O app avisa se alguém colar o Client Secret por engano (ele não é usado para nada).

@@ -19,6 +19,7 @@ import { registerNuvioIpc, destroyNuvioHost } from './nuvio';
 import { registerTorrentIpc, stopTorrentEngine } from './torrent';
 import { streamHeadersFor } from './streamHeaders';
 import { registerSecretsIpc } from './secrets';
+import { registerMalIpc } from './mal';
 import { registerAniListAuthIpc } from './anilistAuth';
 import {
   setupAdblocker,
@@ -2647,6 +2648,7 @@ app.whenReady().then(() => {
   registerNuvioIpc();
   registerTorrentIpc();
   registerSecretsIpc();
+  registerMalIpc();
   registerAniListAuthIpc(() => mainWindow);
   registerAdblockIpcHandlers();
   setupAdblocker();

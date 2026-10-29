@@ -44,7 +44,7 @@ export const DiscoverView: React.FC<{
   const [actionsEl, setActionsEl] = useState<HTMLDivElement | null>(null);
   // Quantos resultados o catálogo principal e as fontes acharam (para não deixar áreas vazias)
   const [mainCount, setMainCount] = useState<number | null>(null);
-  const [srcStatus, setSrcStatus] = useState<SourcesSearchStatus>({ sources: 0, loading: false, hits: 0 });
+  const [srcStatus, setSrcStatus] = useState<SourcesSearchStatus>({ sources: 0, mal: false, loading: false, hits: 0 });
   useEffect(() => setMainCount(null), [query, kind]);
 
   const setKind = (k: Kind) => {
@@ -244,9 +244,13 @@ export const DiscoverView: React.FC<{
             </div>
             <h3 className="text-[15px] font-semibold text-fg">{t('Nada encontrado para "{q}"', { q: query })}</h3>
             <p className="mt-1.5 text-[12.5px] text-fg-muted leading-relaxed">
-              {srcStatus.sources > 0
-                ? t('Procuramos no {src} e em {n} fontes suas. Confira a grafia ou tente o nome em inglês ou japonês.', { src: mainLabel, n: srcStatus.sources })
-                : t('Procuramos no {src}. Confira a grafia ou tente o nome em inglês ou japonês.', { src: mainLabel })}
+              {srcStatus.mal
+                ? srcStatus.sources > 0
+                  ? t('Procuramos no {src}, no MyAnimeList e em {n} fontes suas. Confira a grafia ou tente o nome em inglês ou japonês.', { src: mainLabel, n: srcStatus.sources })
+                  : t('Procuramos no {src} e no MyAnimeList. Confira a grafia ou tente o nome em inglês ou japonês.', { src: mainLabel })
+                : srcStatus.sources > 0
+                  ? t('Procuramos no {src} e em {n} fontes suas. Confira a grafia ou tente o nome em inglês ou japonês.', { src: mainLabel, n: srcStatus.sources })
+                  : t('Procuramos no {src}. Confira a grafia ou tente o nome em inglês ou japonês.', { src: mainLabel })}
             </p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               {kinds

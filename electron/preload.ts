@@ -162,6 +162,15 @@ export interface ElectronAPI {
   videoThumbnail: (args: { input: string; time: number; referer?: string; width?: number }) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
   secretGetSync: (name: string) => string;
   secretSet: (name: string, value: string | null) => Promise<{ success: boolean; encrypted?: boolean }>;
+  malSearch: (args: { query: string; limit?: number; clientId?: string }) => Promise<{
+    success: boolean;
+    via?: 'api' | 'jikan';
+    items?: { id: number; title: string; altTitles: string[]; cover?: string; year?: number; score?: number; type?: string; episodes?: number; genres: string[]; url: string }[];
+    error?: string;
+    clientIdRejected?: boolean;
+  }>;
+  malTest: (clientId: string) => Promise<{ success: boolean; count?: number; error?: string }>;
+  malClearCache: () => Promise<{ success: boolean }>;
   anilistLogin: () => Promise<{ success: boolean; token?: string; expiresAt?: number; error?: string }>;
   anilistLogout: () => Promise<{ success: boolean }>;
   adblockGetSettings: () => Promise<AdblockSettingsInfo>;
@@ -316,6 +325,9 @@ const electronAPI: ElectronAPI = {
     }
   },
   secretSet: (name: string, value: string | null) => ipcRenderer.invoke('secrets:set', name, value),
+  malSearch: (args) => ipcRenderer.invoke('mal:search', args),
+  malTest: (clientId: string) => ipcRenderer.invoke('mal:test', clientId),
+  malClearCache: () => ipcRenderer.invoke('mal:clear-cache'),
   anilistLogin: () => ipcRenderer.invoke('anilist:login'),
   anilistLogout: () => ipcRenderer.invoke('anilist:logout'),
   adblockGetSettings: () => ipcRenderer.invoke('adblock:getSettings'),

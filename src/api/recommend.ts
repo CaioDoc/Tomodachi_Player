@@ -102,6 +102,20 @@ query ($id: Int, $search: String, $type: MediaType) {
   }
 }`;
 
+const BY_MAL_QUERY = `query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { ${MEDIA_FIELDS} } }`;
+
+/** A mesma obra no AniList a partir do ID do MyAnimeList (para abrir a página completa dela) */
+export async function anilistAnimeByMalId(idMal: number): Promise<AniListRecMedia | null> {
+  const res = await fetch('https://graphql.anilist.co', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query: BY_MAL_QUERY, variables: { idMal } }),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`AniList ${res.status}`);
+  return (await res.json())?.data?.Media || null;
+}
+
 const RELATION_ORDER: Record<string, RecReason> = {
   SEQUEL: 'sequel',
   PREQUEL: 'prequel',

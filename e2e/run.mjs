@@ -330,6 +330,54 @@ await step('Descobrir · nada encontrado mostra um aviso só', async () => {
   return 'aviso único com sugestões';
 });
 
+await step('Descobrir · resultados do MyAnimeList (sem chave, pelo Jikan)', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  await visible(page, '[aria-label="Catálogos"] [role=tab]:has-text("Animes")').first().click();
+  await sleep(500);
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('Fullmetal Alchemist');
+  const card = page.locator('section[aria-label="Resultados nas suas fontes"] div:has(> div > span:text-is("MyAnimeList")) button[title] >> visible=true').first();
+  await card.waitFor({ timeout: 45000 });
+  await sleep(1200);
+  await shot(page, 'busca-myanimelist');
+  const row = (await page.locator('section[aria-label="Resultados nas suas fontes"] div:has(> div > span:text-is("MyAnimeList")) >> visible=true').first().innerText()).replace(/\s+/g, ' ').slice(0, 140);
+  const before = await page.locator('[draggable=true]').count();
+  await card.click();
+  await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, before, { timeout: 30000 });
+  await sleep(3000);
+  await shot(page, 'obra-do-myanimelist');
+  const opened = await page.locator('text=/Episódios|Onde assistir|myanimelist/i >> visible=true').count();
+  await page.keyboard.press('Control+w').catch(() => {});
+  await sleep(600);
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  await page.locator('input[placeholder*="ex."] >> visible=true').first().fill('');
+  await sleep(800);
+  if (!/Fullmetal/i.test(row)) throw new Error('MyAnimeList sem a obra: ' + row);
+  if (!opened) throw new Error('a obra do MyAnimeList não abriu');
+  return row;
+});
+
+await step('Configurações · cartão do MyAnimeList', async () => {
+  await goSection('Configurações');
+  await sleep(1000);
+  await visible(page, 'button[role=tab]:has-text("Contas")').first().click();
+  await sleep(800);
+  const inp = visible(page, 'input[aria-label="Client ID do MyAnimeList"]').first();
+  await inp.waitFor({ timeout: 10000 });
+  await inp.fill('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
+  await sleep(400);
+  const warn = await page.locator('text=/parece o Client Secret/ >> visible=true').count();
+  await inp.fill('');
+  const sw = await page.locator('[role=switch][aria-label*="MyAnimeList"] >> visible=true').count();
+  await shot(page, 'config-myanimelist');
+  await goSection('Animes & Vídeos');
+  if (!sw) throw new Error('sem o botão de ligar/desligar');
+  if (!warn) throw new Error('não avisou sobre o Client Secret');
+  return 'cartão, interruptor e aviso do Client Secret';
+});
+
 await step('Mangás · Explorar MangaDex', async () => {
   await goSection('Mangás & Comics');
   await goTab('Explorar');
