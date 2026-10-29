@@ -26,7 +26,7 @@ export interface MalAnime {
 
 export interface MalSearchResult {
   success: boolean;
-  via?: 'api' | 'jikan';
+  via?: 'api' | 'jikan' | 'site';
   items?: MalAnime[];
   error?: string;
   clientIdRejected?: boolean;

@@ -330,14 +330,14 @@ await step('Descobrir · nada encontrado mostra um aviso só', async () => {
   return 'aviso único com sugestões';
 });
 
-await step('MyAnimeList · resposta da busca (Jikan)', async () => {
+await step('MyAnimeList · resposta da busca (sem chave)', async () => {
   const r = await page.evaluate(() => window.electronAPI.malSearch({ query: 'Fullmetal Alchemist', limit: 5 }));
   const info = `success=${r?.success} via=${r?.via} itens=${r?.items?.length ?? 0} erro=${r?.error || '-'} 1º=${r?.items?.[0]?.title || '-'}`;
   if (!r?.success || !r.items?.length) throw new Error(info);
   return info;
 });
 
-await step('Descobrir · resultados do MyAnimeList (sem chave, pelo Jikan)', async () => {
+await step('Descobrir · resultados do MyAnimeList (sem chave)', async () => {
   await goSection('Animes & Vídeos');
   await goTab('Descobrir');
   await visible(page, '[aria-label="Catálogos"] [role=tab]:has-text("Animes")').first().click();

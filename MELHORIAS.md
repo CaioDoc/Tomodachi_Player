@@ -566,7 +566,7 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 ## MyAnimeList na busca (1.6.6-beta)
 
 - **Descobrir → Animes:** a busca também mostra os resultados do **MyAnimeList**, com a nota do MAL em cada capa.
-  - Funciona sem configurar nada, pelo **Jikan** (espelho público do MAL).
+  - Funciona sem configurar nada, pelo **Jikan** (espelho público do MAL); se ele estiver fora do ar, usa a busca rápida do próprio site do MAL.
   - Ao abrir um resultado, o app acha a mesma obra no AniList e abre a página completa (episódios, "Assistir", "Talvez você goste"); se ela não existir no AniList, abre a página do MAL no navegador do app.
 - **Configurações → Contas → MyAnimeList:** liga/desliga a busca no MAL e aceita (opcional) um **Client ID** para usar a API oficial.
   - O Client ID fica guardado criptografado no computador (nunca no código).

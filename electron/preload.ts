@@ -164,7 +164,7 @@ export interface ElectronAPI {
   secretSet: (name: string, value: string | null) => Promise<{ success: boolean; encrypted?: boolean }>;
   malSearch: (args: { query: string; limit?: number; clientId?: string }) => Promise<{
     success: boolean;
-    via?: 'api' | 'jikan';
+    via?: 'api' | 'jikan' | 'site';
     items?: { id: number; title: string; altTitles: string[]; cover?: string; year?: number; score?: number; type?: string; episodes?: number; genres: string[]; url: string }[];
     error?: string;
     clientIdRejected?: boolean;
