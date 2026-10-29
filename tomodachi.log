@@ -1,0 +1,18 @@
+[2026-10-29T17:28:44.916Z] INFO (main) Tomodachi Player 1.6.4-beta iniciado
+[2026-10-29T17:28:59.884Z] INFO (updater) Checking for update
+[2026-10-29T17:28:59.891Z] INFO (updater) Generated new staging user ID: dc3a6d39-e03a-5788-a13e-9c95f3bbb41c
+[2026-10-29T17:29:00.371Z] INFO (updater) Found version 1.6.5-beta (url: Tomodachi-Player-Setup-1.6.5-beta.exe)
+[2026-10-29T17:29:00.372Z] INFO (updater) Downloading update from Tomodachi-Player-Setup-1.6.5-beta.exe
+[2026-10-29T17:29:00.375Z] WARN (updater) disableWebInstaller is set to false, you should set it to true if you do not plan on using a web installer. This will default to true in a future version.
+[2026-10-29T17:29:00.378Z] INFO (updater) Download block maps (old: "https://github.com/CaioDoc/Tomodachi_Player/releases/download/v1.6.4-beta/Tomodachi-Player-Setup-1.6.4-beta.exe.blockmap", new: https://github.com/CaioDoc/Tomodachi_Player/releases/download/v1.6.5-beta/Tomodachi-Player-Setup-1.6.5-beta.exe.blockmap)
+[2026-10-29T17:29:00.513Z] INFO (updater) No cached blockmap for the old installer, downloading it from "https://github.com/CaioDoc/Tomodachi_Player/releases/download/v1.6.4-beta/Tomodachi-Player-Setup-1.6.4-beta.exe.blockmap"
+[2026-10-29T17:29:00.606Z] INFO (updater) File has 67 changed blocks
+[2026-10-29T17:29:00.618Z] INFO (updater) Full: 158,285.06 KB, To download: 1,319.61 KB (1%)
+[2026-10-29T17:29:00.620Z] INFO (updater) Differential download: https://github.com/CaioDoc/Tomodachi_Player/releases/download/v1.6.5-beta/Tomodachi-Player-Setup-1.6.5-beta.exe
+[2026-10-29T17:29:00.717Z] INFO (updater) Redirect to https://release-assets.githubusercontent.com/github-production-release-asset/1435879938/54f8933d-fd1f-4b55-b2ca-722e47050bfd
+[2026-10-29T17:29:02.269Z] INFO (updater) New version 1.6.5-beta has been downloaded to C:\Users\runneradmin\AppData\Local\manga-video-hub-updater\pending\Tomodachi-Player-Setup-1.6.5-beta.exe
+[2026-10-29T17:30:06.870Z] INFO (updater) Install on explicit quitAndInstall
+[2026-10-29T17:30:06.870Z] INFO (updater) Install: isSilent: true, isForceRunAfter: true
+[2026-10-29T17:30:06.871Z] INFO (updater) Executing: C:\Users\runneradmin\AppData\Local\manga-video-hub-updater\pending\Tomodachi-Player-Setup-1.6.5-beta.exe with args: --updated,/S,--force-run
+[2026-10-29T17:30:06.906Z] INFO (updater) Update installer has already been triggered. Quitting application.
+[2026-10-29T17:30:22.962Z] INFO (main) Tomodachi Player 1.6.5-beta iniciado

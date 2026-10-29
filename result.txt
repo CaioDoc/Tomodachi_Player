@@ -1,0 +1,15 @@
+De v1.6.4-beta para a última publicada: v1.6.4-beta
+Instalada: 1.6.4.0 em C:\Users\runneradmin\AppData\Local\Programs\Tomodachi Player\Tomodachi Player.exe
+Versão instalada depois: 1.6.5.0
+App aberto de novo após atualizar: True
+
+FullName                                                                                                 Length
+--------                                                                                                 ------
+C:\Users\runneradmin\AppData\Local\manga-video-hub-updater\pending                                       
+C:\Users\runneradmin\AppData\Local\manga-video-hub-updater\current.blockmap                              123396
+C:\Users\runneradmin\AppData\Local\manga-video-hub-updater\installer.exe                                 162083899
+C:\Users\runneradmin\AppData\Local\manga-video-hub-updater\pending\current.blockmap                      123396
+C:\Users\runneradmin\AppData\Local\manga-video-hub-updater\pending\Tomodachi-Player-Setup-1.6.5-beta.exe 162083899
+C:\Users\runneradmin\AppData\Local\manga-video-hub-updater\pending\update-info.json                      183
+
+

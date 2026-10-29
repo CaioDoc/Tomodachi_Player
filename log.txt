@@ -1,0 +1,5 @@
+17:28:47 estado {"status":"idle","mode":"installer","auto":true,"current":"1.6.4-beta"}
+17:29:02 estado {"status":"downloading","mode":"installer","auto":true,"current":"1.6.4-beta","version":"1.6.5-beta","percent":100}
+17:29:05 estado {"status":"downloaded","mode":"installer","auto":true,"current":"1.6.4-beta","version":"1.6.5-beta","percent":100}
+17:30:06 pedindo "Reiniciar e atualizar"
+17:30:07 app fechou para instalar
