@@ -292,6 +292,44 @@ await step('Fontes · Navegar no catálogo do addon', async () => {
   return `${n} capas`;
 });
 
+await step('Fontes · addon só de links (Torrentio) entra na busca', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Fontes');
+  await page.fill('input[aria-label="Link da fonte"]', 'https://torrentio.strem.fun/manifest.json');
+  await page.keyboard.press('Enter');
+  await page.locator('text=/Addon instalado/').first().waitFor({ timeout: 45000 });
+  await sleep(800);
+  await goTab('Descobrir');
+  await visible(page, '[aria-label="Catálogos"] [role=tab]:has-text("Animes")').first().click();
+  await sleep(500);
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('Breaking Bad');
+  const row = page.locator('section[aria-label="Resultados nas suas fontes"] >> text=Torrentio').first();
+  await row.waitFor({ timeout: 45000 });
+  await page.waitForFunction(() => !/buscando em/i.test(document.querySelector('section[aria-label="Resultados nas suas fontes"]')?.textContent || ''), null, { timeout: 45000 }).catch(() => {});
+  await sleep(1200);
+  await shot(page, 'busca-torrentio');
+  const txt = (await page.locator('section[aria-label="Resultados nas suas fontes"] >> visible=true').first().innerText()).replace(/\s+/g, ' ').slice(0, 160);
+  await input.fill('');
+  await sleep(800);
+  if (!/Breaking Bad/i.test(txt)) throw new Error('Torrentio apareceu sem a obra: ' + txt);
+  return txt;
+});
+
+await step('Descobrir · nada encontrado mostra um aviso só', async () => {
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('qzxv wqpz 9137');
+  await page.locator('text=/Nada encontrado para/ >> visible=true').first().waitFor({ timeout: 60000 });
+  await sleep(800);
+  await shot(page, 'nada-encontrado');
+  const old = await page.locator('text=Nenhum anime encontrado >> visible=true').count();
+  const srcEmpty = await page.locator('section[aria-label="Resultados nas suas fontes"] >> visible=true').count();
+  await input.fill('');
+  await sleep(1500);
+  if (old || srcEmpty) throw new Error(`ainda sobra área vazia (catálogo: ${old}, fontes: ${srcEmpty})`);
+  return 'aviso único com sugestões';
+});
+
 await step('Mangás · Explorar MangaDex', async () => {
   await goSection('Mangás & Comics');
   await goTab('Explorar');

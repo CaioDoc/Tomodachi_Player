@@ -40,6 +40,22 @@ const parts: Parts = {
   '{n} fonte': ['{n} source', '{n} fuente'],
   '{n} fontes': ['{n} sources', '{n} fuentes'],
   Recomendado: ['Recommended', 'Recomendado'],
+  'addon · procurado no catálogo': ['addon · searched in its catalog', 'addon · buscado en su catálogo'],
+  'links · obras achadas pelo Cinemeta': ['links · titles found via Cinemeta', 'enlaces · obras encontradas en Cinemeta'],
+  '{n} plugin do Nuvio': ['{n} Nuvio plugin', '{n} plugin de Nuvio'],
+  '{n} plugins do Nuvio': ['{n} Nuvio plugins', '{n} plugins de Nuvio'],
+  'nada no {src} para essa busca': ['nothing on {src} for this search', 'nada en {src} para esta búsqueda'],
+  'Procuramos no {src} e em {n} fontes suas. Confira a grafia ou tente o nome em inglês ou japonês.': [
+    'We searched {src} and {n} of your sources. Check the spelling or try the English or Japanese title.',
+    'Buscamos en {src} y en {n} de tus fuentes. Revisa la ortografía o prueba el nombre en inglés o japonés.',
+  ],
+  'Procuramos no {src}. Confira a grafia ou tente o nome em inglês ou japonês.': [
+    'We searched {src}. Check the spelling or try the English or Japanese title.',
+    'Buscamos en {src}. Revisa la ortografía o prueba el nombre en inglés o japonés.',
+  ],
+  'Buscar em {kind}': ['Search {kind}', 'Buscar en {kind}'],
+  'Adicionar mais fontes': ['Add more sources', 'Agregar más fuentes'],
+  'Adicionar fontes para achar mais obras': ['Add sources to find more titles', 'Agrega fuentes para encontrar más obras'],
 };
 
 export default parts;

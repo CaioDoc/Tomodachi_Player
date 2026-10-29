@@ -153,11 +153,13 @@ interface AniListBrowserProps {
   onOpenTab?: (type: TabType | any, title: string, data?: any) => void;
   /** Busca controlada de fora (barra única do Descobrir); esconde a busca própria */
   externalQuery?: string;
+  /** Quantos resultados a busca trouxe (null = carregando, -1 = erro) */
+  onResults?: (count: number | null) => void;
   /** Onde colocar os botões Atualizar capas / Webview (barra do Descobrir) */
   actionsTarget?: HTMLElement | null;
 }
 
-export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, externalQuery, actionsTarget }) => {
+export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, externalQuery, actionsTarget, onResults }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const embedded = externalQuery !== undefined;
   const [animes, setAnimes] = useState<AniListMedia[]>([]);
@@ -243,6 +245,12 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
     },
     [favoriteMap]
   );
+
+  // Conta os resultados para o Descobrir decidir o aviso de "nada encontrado"
+  useEffect(() => {
+    onResults?.(loading ? null : loadError ? -1 : animes.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, loadError, animes]);
 
   // Busca vinda da barra do Descobrir
   useEffect(() => {

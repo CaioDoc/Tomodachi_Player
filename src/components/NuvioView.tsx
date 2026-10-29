@@ -478,7 +478,9 @@ export const Catalog: React.FC<{
   embedded?: { kind?: Kind; sourceKey?: string; query: string };
   /** Onde colocar os botões Atualizar / Webview (barra do Descobrir) */
   actionsTarget?: HTMLElement | null;
-}> = ({ onOpenTab, onGoToPlugins, embedded, actionsTarget }) => {
+  /** Quantos resultados a busca trouxe (null = carregando, -1 = erro) */
+  onResults?: (count: number | null) => void;
+}> = ({ onOpenTab, onGoToPlugins, embedded, actionsTarget, onResults }) => {
   const [kindState, setKindState] = useState<Kind>(() => {
     try {
       const k = localStorage.getItem(KIND_KEY);
@@ -519,6 +521,7 @@ export const Catalog: React.FC<{
     }
   };
   const reqId = useRef(0);
+  const loadsDone = useRef(0);
 
   const setKind = (k: Kind) => {
     setKindState(k);
@@ -565,12 +568,21 @@ export const Catalog: React.FC<{
       } catch (err: any) {
         if (id === reqId.current) setError(String(err?.message || err));
       } finally {
-        if (id === reqId.current) setLoading(false);
+        if (id === reqId.current) {
+          loadsDone.current++;
+          setLoading(false);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [type, searchText, queryGenres, effectiveGenre, items.length, addonRef?.key, genre]
   );
+
+  useEffect(() => {
+    if (!onResults) return;
+    onResults(loading || loadsDone.current === 0 ? null : error && items.length === 0 ? -1 : items.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, items]);
 
   useEffect(() => {
     setItems([]);

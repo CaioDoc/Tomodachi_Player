@@ -4,11 +4,11 @@
 // Navegar pelo catálogo de uma fonte específica fica em Fontes → "Navegar".
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, X, Sparkles, Tv, Film, Puzzle } from 'lucide-react';
+import { Search, SearchX, X, Sparkles, Tv, Film, Puzzle } from 'lucide-react';
 import { AniListBrowser } from './AniListBrowser';
 import { Catalog } from './NuvioView';
 import { ContinueWatching } from './ContinueWatching';
-import { SourcesSearch } from './SourcesSearch';
+import { SourcesSearch, type SourcesSearchStatus } from './SourcesSearch';
 import { NUVIO_EVENT } from '../api/nuvio';
 import { videoSourceCounts } from '../api/sources';
 import { t } from '../i18n';
@@ -42,6 +42,10 @@ export const DiscoverView: React.FC<{
   const inputRef = useRef<HTMLInputElement>(null);
   // Botões do catálogo atual (Atualizar capas / Webview) entram aqui, ao lado das abas
   const [actionsEl, setActionsEl] = useState<HTMLDivElement | null>(null);
+  // Quantos resultados o catálogo principal e as fontes acharam (para não deixar áreas vazias)
+  const [mainCount, setMainCount] = useState<number | null>(null);
+  const [srcStatus, setSrcStatus] = useState<SourcesSearchStatus>({ sources: 0, loading: false, hits: 0 });
+  useEffect(() => setMainCount(null), [query, kind]);
 
   const setKind = (k: Kind) => {
     setKindState(k);
@@ -94,6 +98,11 @@ export const DiscoverView: React.FC<{
   const showParts = parts.length > 1 || parts.some((p) => p.kind !== 'text');
   // Nas fontes só faz sentido buscar o texto (gêneros e tags são filtros dos catálogos)
   const sourcesQuery = useMemo(() => parts.filter((p) => p.kind === 'text').map((p) => p.value).join(' ').trim(), [parts]);
+  const mainLabel = kind === 'anilist' ? 'AniList' : 'Cinemeta';
+  // Catálogo principal sem nada: some (sem área vazia) e as fontes ocupam o espaço;
+  // se as fontes também não acharam nada, mostra um aviso só, com sugestões
+  const mainEmpty = !!query && mainCount === 0;
+  const nothingFound = mainEmpty && !srcStatus.loading && srcStatus.hits === 0;
   const removeTerm = (idx: number) => {
     const next = parseTerms(input).filter((_, i) => i !== idx).join(', ');
     setInput(next);
@@ -216,15 +225,70 @@ export const DiscoverView: React.FC<{
       )}
 
       {/* Também procura em todas as fontes instaladas (o que não está no AniList/Cinemeta) */}
-      <SourcesSearch query={sourcesQuery} onOpenTab={onOpenTab} />
+      <SourcesSearch
+        query={sourcesQuery}
+        kind={kind}
+        onOpenTab={onOpenTab}
+        expand={mainEmpty}
+        note={mainEmpty ? t('nada no {src} para essa busca', { src: mainLabel }) : undefined}
+        onStatus={setSrcStatus}
+      />
 
       {!query && <ContinueWatching onOpenTab={onOpenTab} />}
 
-      <div className="flex-1 min-h-0 overflow-hidden">
+      {nothingFound && (
+        <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center p-8">
+          <div className="max-w-md text-center">
+            <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-subtle border border-line-subtle flex items-center justify-center text-fg-muted">
+              <SearchX size={24} />
+            </div>
+            <h3 className="text-[15px] font-semibold text-fg">{t('Nada encontrado para "{q}"', { q: query })}</h3>
+            <p className="mt-1.5 text-[12.5px] text-fg-muted leading-relaxed">
+              {srcStatus.sources > 0
+                ? t('Procuramos no {src} e em {n} fontes suas. Confira a grafia ou tente o nome em inglês ou japonês.', { src: mainLabel, n: srcStatus.sources })
+                : t('Procuramos no {src}. Confira a grafia ou tente o nome em inglês ou japonês.', { src: mainLabel })}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {kinds
+                .filter(([k]) => k !== kind)
+                .map(([k, label, icon]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setKind(k)}
+                    className="h-8 px-3 rounded-md bg-subtle hover:bg-elevated border border-line-subtle text-[12.5px] text-fg inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {icon}
+                    {t('Buscar em {kind}', { kind: label })}
+                  </button>
+                ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setInput('');
+                  setQuery('');
+                  inputRef.current?.focus();
+                }}
+                className="h-8 px-3 rounded-md text-[12.5px] text-fg-muted hover:text-fg inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <X size={13} />
+                {t('Limpar busca')}
+              </button>
+            </div>
+            <button type="button" onClick={onGoToSources} className="mt-5 text-[12px] text-accent hover:underline cursor-pointer inline-flex items-center gap-1.5">
+              <Puzzle size={13} />
+              {srcStatus.sources > 0 ? t('Adicionar mais fontes') : t('Adicionar fontes para achar mais obras')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Fica montado (e escondido) quando não achou nada, para atualizar sozinho ao mudar a busca */}
+      <div className={`flex-1 min-h-0 overflow-hidden ${mainEmpty ? 'hidden' : ''}`}>
         {kind === 'anilist' ? (
-          <AniListBrowser onOpenTab={onOpenTab} externalQuery={query} actionsTarget={actionsEl} />
+          <AniListBrowser onOpenTab={onOpenTab} externalQuery={query} actionsTarget={actionsEl} onResults={setMainCount} />
         ) : (
-          <Catalog key={kind} onOpenTab={onOpenTab} embedded={{ kind, query }} actionsTarget={actionsEl} />
+          <Catalog key={kind} onOpenTab={onOpenTab} embedded={{ kind, query }} actionsTarget={actionsEl} onResults={setMainCount} />
         )}
       </div>
     </div>

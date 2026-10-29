@@ -549,7 +549,16 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 - **Duas cópias instaladas:** se uma versão mais nova é aberta enquanto uma mais antiga (de outra pasta) já está aberta, a antiga avisa e oferece fechar e abrir a nova. Antes a antiga só vinha para a frente, e parecia que a instalação nova não tinha funcionado.
 - **Configurações → Sistema → Atualizações:** mostra o caminho da cópia em uso ("Esta cópia está em: …").
 
-## Busca em todas as fontes + Doar em todas as telas (1.6.4-beta, ainda não publicada)
+## Busca em todas as fontes + Doar em todas as telas (1.6.4-beta)
 
 - **Descobrir busca também nas suas fontes:** além do AniList/Cinemeta, a busca procura em todas as extensões (sites) e addons com busca instalados, ao mesmo tempo (até 4 por vez). Aparece no topo uma seção "Nas suas fontes" com uma fileira por fonte (pode recolher); clicar abre a obra direto daquela fonte. Gêneros/tags não entram nessa busca, só o texto. Plugins do Nuvio não têm catálogo, então continuam aparecendo só no "Onde assistir".
 - **Botão "Doar"** agora aparece em todas as telas de Mangás & Comics e de Animes & Vídeos (Biblioteca, Explorar/Descobrir, Fontes e Local).
+
+## Busca em todos os addons + fim das áreas vazias (1.6.5-beta)
+
+- **Addons de catálogo sem busca** (ex.: alguns catálogos de anime): o app procura o nome nas primeiras páginas do catálogo, em vez de ignorar o addon.
+- **Addons só de links** (Torrentio, Comet, MediaFusion…) e **plugins do Nuvio**: como não têm catálogo, a obra é achada pelo Cinemeta (IMDb), que é o que esses addons entendem. Aparece a fileira "Torrentio · links · obras achadas pelo Cinemeta"; ao abrir, "Assistir" usa esses addons.
+- **Sem áreas vazias**:
+  - fontes sem resultado não ocupam mais espaço;
+  - se o AniList/Cinemeta não acha nada, a grade some e os resultados das fontes ocupam a tela, com o aviso "nada no AniList para essa busca";
+  - se nada é achado em lugar nenhum, aparece um aviso só, com "Buscar em Séries/Filmes/Animes", "Limpar busca" e "Adicionar fontes".
