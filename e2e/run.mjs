@@ -132,6 +132,61 @@ await step('Página da obra (série)', async () => {
   return `abriu com temporadas (${eps} episódios na lista)`;
 });
 
+await step('Talvez você goste (série)', async () => {
+  const sec = page.locator('section[aria-label="Talvez você goste"] >> visible=true').first();
+  await sec.waitFor({ timeout: 30000 });
+  await sec.scrollIntoViewIfNeeded();
+  await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').first().waitFor({ timeout: 30000 });
+  await sleep(2500);
+  await shot(page, 'talvez-voce-goste-serie');
+  const n = await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').count();
+  const labels = await page.locator('section[aria-label="Talvez você goste"] button.group span.absolute.top-1\\.5 >> visible=true').allInnerTexts();
+  return `${n} sugestões (${[...new Set(labels)].join(', ')})`;
+});
+
+await step('Tags clicáveis (série → Descobrir)', async () => {
+  const tag = page.locator('button[title^="Ver obras com"] >> visible=true').first();
+  const name = (await tag.innerText()).trim();
+  await tag.click();
+  await sleep(4000);
+  const val = await page.locator('input[placeholder*="ex."] >> visible=true').first().inputValue();
+  await shot(page, 'tag-clicada-descobrir');
+  if (val.trim().toLowerCase() !== name.toLowerCase()) throw new Error(`busca "${val}" ≠ tag "${name}"`);
+  return `tag "${name}" abriu o Descobrir buscando por ela`;
+});
+
+await step('Busca por tags no Descobrir (Seinen, Monster)', async () => {
+  await visible(page, '[aria-label="Catálogos"] [role=tab]:has-text("Animes")').first().click();
+  await sleep(800);
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('Seinen, Monster');
+  await sleep(5000);
+  await shot(page, 'busca-tags-anime');
+  const row = await page.locator('[aria-label="Filtros da busca"] >> visible=true').first().innerText();
+  const n = await visible(page, 'button[title^="Marcar para favoritar"]').count();
+  await input.fill('');
+  await sleep(2500);
+  if (!/Tag\s*Seinen/i.test(row.replace(/\s+/g, ' '))) throw new Error('não reconheceu a tag: ' + row);
+  return `${row.replace(/\s+/g, ' ')} → ${n} animes`;
+});
+
+await step('Página de anime + Talvez você goste (AniList)', async () => {
+  await visible(page, 'h4').first().click();
+  const sec = page.locator('section[aria-label="Talvez você goste"] >> visible=true').first();
+  await sec.waitFor({ timeout: 30000 });
+  await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').first().waitFor({ timeout: 30000 });
+  await sec.scrollIntoViewIfNeeded();
+  await sleep(2500);
+  await shot(page, 'talvez-voce-goste-anime');
+  const n = await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').count();
+  const tags = await page.locator('button[title^="Ver obras com"] >> visible=true').allInnerTexts();
+  const first = (await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').first().innerText()).split('\n').slice(0, 2).join(' / ');
+  await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').first().click();
+  await sleep(4000);
+  await shot(page, 'sugestao-aberta');
+  return `${n} sugestões; 1ª: ${first}; ${tags.length} tags: ${tags.slice(0, 8).join(', ')}`;
+});
+
 await step('Onde assistir (sem fontes instaladas)', async () => {
   await visible(page, 'button:has-text("Assistir")').first().click();
   await page.locator('text=Onde assistir').first().waitFor({ timeout: 15000 });
@@ -164,6 +219,24 @@ await step('Favoritar em lote', async () => {
   await shot(page, 'biblioteca-depois-do-lote');
   const txt = await visible(page, '[role=tab]:has-text("Biblioteca")').first().innerText();
   return `biblioteca: ${txt.replace(/\s+/g, ' ')}`;
+});
+
+await step('Biblioteca · busca por tags e sem aba Favoritos', async () => {
+  const favTab = await page.locator('[role=tablist][aria-label="Categorias"] button:has-text("Favoritos") >> visible=true').count();
+  const input = page.locator('input[placeholder^="Buscar por título"] >> visible=true').first();
+  const sug = page.locator('button[title^="Filtrar também por"] >> visible=true');
+  const nSug = await sug.count();
+  let note = `aba Favoritos: ${favTab ? 'ainda aparece' : 'removida'}; ${nSug} tags sugeridas`;
+  if (nSug) {
+    const tg = (await sug.first().innerText()).replace(/\s+\d+$/, '');
+    await sug.first().click();
+    await sleep(600);
+    note += `; filtrando por "${tg}": ${await input.inputValue()}`;
+  }
+  await shot(page, 'biblioteca-tags');
+  await input.fill('');
+  if (favTab) throw new Error(note);
+  return note;
 });
 
 await step('Fontes · instalar addon (Anime Kitsu, só catálogo)', async () => {
@@ -214,6 +287,16 @@ await step('Mangás · detalhe e leitura (MangaDex)', async () => {
     return `${caps}; leitor abriu com ${imgs} imagens visíveis`;
   }
   return `${caps} (sem capítulo para abrir)`;
+});
+
+await step('Mangás · Talvez você goste (MangaDex)', async () => {
+  const sec = page.locator('section[aria-label="Talvez você goste"] >> visible=true').first();
+  await sec.waitFor({ timeout: 30000 });
+  await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').first().waitFor({ timeout: 30000 });
+  await sec.scrollIntoViewIfNeeded();
+  await sleep(2500);
+  await shot(page, 'talvez-voce-goste-manga');
+  return `${await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').count()} sugestões`;
 });
 
 await step('Vídeo local · adicionar pasta e tocar', async () => {
