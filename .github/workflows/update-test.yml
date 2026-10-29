@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  FROM_TAG: v1.6.3-beta
+  FROM_TAG: v1.6.4-beta
 
 jobs:
   update:
@@ -46,7 +46,7 @@ jobs:
           for ($i = 0; $i -lt 60; $i++) {
             $exe = Get-Item $env:APP_EXE -ErrorAction SilentlyContinue
             $ver = $exe.VersionInfo.ProductVersion
-            if ($ver -and $ver -notlike '1.6.3*') { break }
+            if ($ver -and $ver -notlike '1.6.4*') { break }
             Start-Sleep 3
           }
           "Versão instalada depois: $ver" | Tee-Object update-out\result.txt -Append
