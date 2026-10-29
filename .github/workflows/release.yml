@@ -39,13 +39,16 @@ jobs:
       - name: Ler a versão
         id: ver
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="v$VERSION"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          elif git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+          # Só pula se a versão já estiver publicada COM os arquivos da atualização automática.
+          # (Uma release sem arquivos, de uma tentativa que falhou, é refeita.)
+          HAS=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq '[.assets[].name | select(test("^latest.*\\.yml$"))] | length' 2>/dev/null || echo 0)
+          if [[ "$GITHUB_REF" != refs/tags/* && "${HAS:-0}" -gt 0 ]]; then
             echo "A versão $TAG já foi publicada; nada a fazer."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
@@ -88,8 +91,24 @@ jobs:
             release/*.yml
           if-no-files-found: error
 
-      - name: Publicar na página de Releases
+      - name: Limpar rascunhos e releases vazias desta versão
         if: steps.ver.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          # Rascunhos do pacote de teste e releases sem arquivos com a mesma tag atrapalham a publicação
+          gh api "repos/${{ github.repository }}/releases?per_page=100" --jq ".[] | select(.tag_name == \"$TAG\") | select(.draft or (.assets | length) == 0) | .id" |
+            while read -r id; do
+              [ -n "$id" ] && gh api -X DELETE "repos/${{ github.repository }}/releases/$id" && echo "removida: $id"
+            done
+          true
+
+      - name: Publicar na página de Releases
+        id: pub
+        if: steps.ver.outputs.skip != 'true'
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
@@ -104,3 +123,38 @@ jobs:
             release/latest*.yml
             release/beta*.yml
             release/alpha*.yml
+
+      - name: Esperar antes de tentar de novo
+        if: steps.ver.outputs.skip != 'true' && steps.pub.outcome == 'failure'
+        shell: bash
+        run: sleep 20
+
+      - name: Publicar (segunda tentativa)
+        id: pub2
+        if: steps.ver.outputs.skip != 'true' && steps.pub.outcome == 'failure'
+        continue-on-error: false
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Tomodachi Player ${{ steps.ver.outputs.tag }}
+          prerelease: ${{ steps.ver.outputs.prerelease }}
+          generate_release_notes: true
+          # .yml e .blockmap: usados pela atualização automática do app (electron-updater)
+          files: |
+            release/*.exe
+            release/*.blockmap
+            release/latest*.yml
+            release/beta*.yml
+            release/alpha*.yml
+
+      - name: Conferir os arquivos da atualização automática
+        if: steps.ver.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq '.assets[].name' | tee assets.txt
+          grep -q '^latest.yml$' assets.txt || { echo "::error::latest.yml não está na release $TAG"; exit 1; }
+          grep -q 'Setup.*\.exe$' assets.txt || { echo "::error::instalador não está na release $TAG"; exit 1; }
