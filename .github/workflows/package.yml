@@ -1,0 +1,61 @@
+# Pacote de teste: monta o instalador da branch "dev" e guarda num RASCUNHO de release.
+# Rascunhos só aparecem para o dono do repositório e não são vistos pela atualização automática,
+# então dá para testar antes de soltar. Para soltar, é só publicar o rascunho (ou levar a versão para a main).
+name: Package (test)
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-dev
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci || npm install
+      - name: Compilar
+        run: npm run build
+      - name: Empacotar
+        run: npx electron-builder --win nsis portable --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Ler a versão
+        id: ver
+        shell: bash
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Apagar o rascunho anterior desta versão
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases?per_page=30" --jq '.[] | select(.draft and .tag_name=="${{ steps.ver.outputs.tag }}") | .id' | while read id; do
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$id"
+          done
+      - name: Guardar no rascunho de release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: true
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Tomodachi Player ${{ steps.ver.outputs.tag }} (pacote de teste)
+          body: |
+            Pacote de teste da branch dev (commit ${{ github.sha }}). Ainda não publicado.
+          files: |
+            release/*.exe
+            release/*.blockmap
+            release/latest*.yml
+            release/beta*.yml
