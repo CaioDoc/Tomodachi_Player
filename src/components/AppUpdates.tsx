@@ -239,3 +239,49 @@ export const UpdateNotice: React.FC = () => {
     </div>
   );
 };
+
+const LAST_VERSION_KEY = 'tp_last_version';
+
+/** Depois de uma atualização: "Atualizado para a versão X" com link para as novidades */
+export const UpdatedNotice: React.FC = () => {
+  const [prev] = useState<string | null>(() => {
+    try {
+      const p = localStorage.getItem(LAST_VERSION_KEY);
+      localStorage.setItem(LAST_VERSION_KEY, APP_VERSION);
+      return p && p !== APP_VERSION ? p : null;
+    } catch {
+      return null;
+    }
+  });
+  const [open, setOpen] = useState(!!prev);
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setTimeout(() => setOpen(false), 15000);
+    return () => window.clearTimeout(id);
+  }, [open]);
+  if (!open || !prev) return null;
+  const url = `https://github.com/CaioDoc/Tomodachi_Player/releases/tag/v${APP_VERSION}`;
+  return (
+    <div role="status" className="fixed bottom-5 right-5 z-[9400] w-[300px] rounded-xl border border-line bg-elevated shadow-2xl p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+      <button type="button" onClick={() => setOpen(false)} aria-label={t('Fechar')} className="absolute top-2 right-2 p-1 rounded text-fg-muted hover:text-fg hover:bg-subtle cursor-pointer">
+        <X size={14} />
+      </button>
+      <div className="flex items-center gap-2 text-[13px] font-semibold text-fg pr-6">
+        <CheckCircle2 size={15} className="text-success-fg" />
+        {t('Atualizado para a versão {v}', { v: APP_VERSION })}
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          const a = (window as any).electronAPI;
+          if (a?.openExternal) void a.openExternal(url);
+          else window.open(url, '_blank', 'noopener');
+          setOpen(false);
+        }}
+        className="mt-2 text-[12px] text-accent hover:underline inline-flex items-center gap-1 cursor-pointer"
+      >
+        <ExternalLink size={12} /> {t('Ver o que mudou')}
+      </button>
+    </div>
+  );
+};

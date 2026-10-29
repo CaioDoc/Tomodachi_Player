@@ -538,3 +538,7 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 - **Versão portátil / build local:** não dá para se atualizar sozinha; o app avisa e abre a página de download.
 - Aviso flutuante no canto quando a atualização está pronta ("Reiniciar e atualizar" / "Depois").
 - O GitHub Actions passou a publicar também os arquivos `beta.yml`/`latest.yml` e `.blockmap` que o atualizador usa.
+
+## Aviso "Atualizado para a versão X" (1.6.2-beta)
+
+- Depois que o app se atualiza, aparece no canto "Atualizado para a versão X · Ver o que mudou" (some sozinho em 15 s). Também serve de primeira versão para testar a atualização automática de ponta a ponta (1.6.1 → 1.6.2).

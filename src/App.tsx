@@ -27,7 +27,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { FeedbackHost } from './components/Feedback';
 import { CommandPalette } from './components/CommandPalette';
 import { WelcomeDialog } from './components/WelcomeDialog';
-import { UpdateNotice } from './components/AppUpdates';
+import { UpdateNotice, UpdatedNotice } from './components/AppUpdates';
 import { readLibrary } from './utils/libraryStore';
 import type { TabItem, TabType, SubTab } from './types';
 import { LABELS, type SectionView } from './constants/labels';
@@ -737,6 +737,7 @@ export const App: React.FC = () => {
 
       <WatchSourcesDrawer onOpenTab={handleOpenTab} />
       <UpdateNotice />
+      <UpdatedNotice />
 
       <CommandPalette
         open={paletteOpen}
