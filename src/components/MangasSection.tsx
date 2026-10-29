@@ -244,6 +244,7 @@ export const MangasSection: React.FC<MangasSectionProps> = ({
           active={view === 'history'}
           onClick={() => onChangeView(view === 'history' ? 'library' : 'history')}
         />
+        <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
         <SectionAction
           primary
           icon={<RefreshCw size={14} />}
@@ -267,7 +268,9 @@ export const MangasSection: React.FC<MangasSectionProps> = ({
         <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
         <SectionAction icon={<ArchiveRestore size={14} />} label={t('Backup')} active={!!backupMode} onClick={() => setBackupMode('menu')} />
       </>
-    ) : null;
+    ) : (
+      <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
+    );
 
   return (
     <div className="h-full w-full bg-surface text-fg-2 select-none overflow-hidden flex flex-col">

@@ -29,6 +29,16 @@ const parts: Parts = {
   'Spin-off': ['Spin-off', 'Spin-off'],
   'Outra versão': ['Alternate version', 'Otra versión'],
   'Mesma franquia': ['Same franchise', 'Misma franquicia'],
+  'Resultados nas suas fontes': ['Results in your sources', 'Resultados en tus fuentes'],
+  'Nas suas fontes': ['In your sources', 'En tus fuentes'],
+  'buscando em {n} de {total}…': ['searching {n} of {total}…', 'buscando en {n} de {total}…'],
+  'nada encontrado nas {n} fontes': ['nothing found in {n} sources', 'nada encontrado en {n} fuentes'],
+  extensão: ['extension', 'extensión'],
+  addon: ['addon', 'addon'],
+  'Sem resultados em: {names}': ['No results in: {names}', 'Sin resultados en: {names}'],
+  erro: ['error', 'error'],
+  '{n} fonte': ['{n} source', '{n} fuente'],
+  '{n} fontes': ['{n} sources', '{n} fuentes'],
   Recomendado: ['Recommended', 'Recomendado'],
 };
 

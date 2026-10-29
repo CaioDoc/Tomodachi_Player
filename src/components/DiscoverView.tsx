@@ -8,6 +8,7 @@ import { Search, X, Sparkles, Tv, Film, Puzzle } from 'lucide-react';
 import { AniListBrowser } from './AniListBrowser';
 import { Catalog } from './NuvioView';
 import { ContinueWatching } from './ContinueWatching';
+import { SourcesSearch } from './SourcesSearch';
 import { NUVIO_EVENT } from '../api/nuvio';
 import { videoSourceCounts } from '../api/sources';
 import { t } from '../i18n';
@@ -91,6 +92,8 @@ export const DiscoverView: React.FC<{
     return kind === 'anilist' ? parseAniListQuery(query, tagNames).parts : parseGenreQuery(query, NUVIO_GENRES).parts;
   }, [query, kind, tagNames]);
   const showParts = parts.length > 1 || parts.some((p) => p.kind !== 'text');
+  // Nas fontes só faz sentido buscar o texto (gêneros e tags são filtros dos catálogos)
+  const sourcesQuery = useMemo(() => parts.filter((p) => p.kind === 'text').map((p) => p.value).join(' ').trim(), [parts]);
   const removeTerm = (idx: number) => {
     const next = parseTerms(input).filter((_, i) => i !== idx).join(', ');
     setInput(next);
@@ -211,6 +214,9 @@ export const DiscoverView: React.FC<{
           <span className="text-[11px] text-fg-muted shrink-0 ml-1">{t('Separe por vírgula para combinar')}</span>
         </div>
       )}
+
+      {/* Também procura em todas as fontes instaladas (o que não está no AniList/Cinemeta) */}
+      <SourcesSearch query={sourcesQuery} onOpenTab={onOpenTab} />
 
       {!query && <ContinueWatching onOpenTab={onOpenTab} />}
 

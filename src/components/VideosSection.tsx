@@ -134,6 +134,7 @@ export const VideosSection: React.FC<VideosSectionProps> = ({ onOpenTab, view, o
       <>
         <SectionAction icon={<History size={14} />} label={t('Histórico')} active={view === 'history'} onClick={() => onChangeView(view === 'history' ? 'library' : 'history')} />
         <SectionAction icon={<ArchiveRestore size={14} />} label={t('Backup')} active={!!backupMode} onClick={() => setBackupMode('menu')} />
+        <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
         <SectionAction
           primary
           icon={<RefreshCw size={14} />}
@@ -146,9 +147,9 @@ export const VideosSection: React.FC<VideosSectionProps> = ({ onOpenTab, view, o
           }}
         />
       </>
-    ) : group === 'explore' || group === 'sources' ? (
+    ) : (
       <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
-    ) : null;
+    );
 
   return (
     <div className="h-full w-full bg-surface text-fg-2 select-none overflow-hidden flex flex-col">

@@ -548,3 +548,8 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 - **Atualização automática testada de ponta a ponta:** num Windows limpo, a 1.6.1 instalada achou a 1.6.2 em 15 s, baixou sozinha e, em "Reiniciar e atualizar", instalou e abriu de novo já na 1.6.2.
 - **Duas cópias instaladas:** se uma versão mais nova é aberta enquanto uma mais antiga (de outra pasta) já está aberta, a antiga avisa e oferece fechar e abrir a nova. Antes a antiga só vinha para a frente, e parecia que a instalação nova não tinha funcionado.
 - **Configurações → Sistema → Atualizações:** mostra o caminho da cópia em uso ("Esta cópia está em: …").
+
+## Busca em todas as fontes + Doar em todas as telas (1.6.4-beta, ainda não publicada)
+
+- **Descobrir busca também nas suas fontes:** além do AniList/Cinemeta, a busca procura em todas as extensões (sites) e addons com busca instalados, ao mesmo tempo (até 4 por vez). Aparece no topo uma seção "Nas suas fontes" com uma fileira por fonte (pode recolher); clicar abre a obra direto daquela fonte. Gêneros/tags não entram nessa busca, só o texto. Plugins do Nuvio não têm catálogo, então continuam aparecendo só no "Onde assistir".
+- **Botão "Doar"** agora aparece em todas as telas de Mangás & Comics e de Animes & Vídeos (Biblioteca, Explorar/Descobrir, Fontes e Local).
