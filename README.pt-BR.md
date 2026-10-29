@@ -79,13 +79,13 @@ Os executáveis são gerados automaticamente pelo GitHub Actions direto do códi
 - **Talvez você goste:** a página de cada obra mostra continuações, histórias anteriores, spin-offs e obras parecidas, e as tags dela são clicáveis para achar mais do mesmo estilo.
 - Importar e exportar backups compatíveis com o Mihon e o Aniyomi (`.tachibk`), para trazer a biblioteca do celular.
 - Temas.
+- **Atualização automática:** o app instalado baixa as versões novas em segundo plano e instala quando você fecha (dá para desligar em Configurações → Sistema).
 - Interface em **Português (Brasil), English e Español**.
 
 ## Próximos passos
 
 O projeto está andando rápido. Na fila:
 
-- Atualização automática dentro do app.
 - Mais ajustes e correções toda semana, guiados pelo seu feedback.
 
 ## Apoie o projeto

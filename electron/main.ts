@@ -12,6 +12,7 @@ import { startVideoServer, NEEDS_TRANSCODE } from './videoServer';
 import { registerMediaProtocol, getFfmpegPath } from './mediaProtocol';
 import { registerDownloadIpcHandlers } from './downloads';
 import { setupLogging } from './logger';
+import { setupUpdater } from './updater';
 import { registerSuwayomiIpcHandlers, suwayomiAuthFor } from './suwayomi';
 import { registerMediaProbeIpc } from './mediaProbe';
 import { registerNuvioIpc, destroyNuvioHost } from './nuvio';
@@ -2489,6 +2490,7 @@ function setupIpcHandlers() {
 
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;
+  setupUpdater();
   // 1. Bypass inteligente de anti-hotlink (403 Forbidden) para capas e páginas de mangás
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['http://*/*', 'https://*/*'] },

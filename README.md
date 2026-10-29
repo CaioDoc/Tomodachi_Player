@@ -79,13 +79,13 @@ Every executable is built automatically by GitHub Actions straight from this rep
 - **You might also like:** every title page shows sequels, prequels, spin-offs and similar titles, and its tags are clickable to find more like it.
 - Import and export library backups compatible with Mihon and Aniyomi (`.tachibk`), so you can bring your phone library over.
 - Themes.
+- **Automatic updates:** the installed app downloads new versions in the background and installs them when you close it (you can turn this off in Settings → System).
 - Interface in **English, Português (Brasil) and Español**.
 
 ## Roadmap
 
 The project is moving fast. Next up:
 
-- Automatic updates inside the app.
 - More polish and fixes every week, driven by your feedback.
 
 ## Support the project

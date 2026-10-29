@@ -33,6 +33,7 @@ import { LanguageDropdown } from './LanguagePicker';
 import { SupportBanner } from './SupportBanner';
 import { ExtensionAutoUpdateCard } from './ExtensionAutoUpdateCard';
 import { KomgaSettingsTab } from './KomgaSettingsTab';
+import { AppUpdatesCard } from './AppUpdates';
 import type { ExtensionRepo } from '../types';
 import { t, tn, tMaybe } from '../i18n';
 
@@ -438,6 +439,7 @@ export const SettingsRepos: React.FC = () => {
 
       {activeSection === 'system' && (
         <div className="max-w-2xl space-y-4">
+          <AppUpdatesCard />
           <div className="p-5 bg-surface rounded-lg border border-line space-y-3 shadow-sm">
             <h2 className="text-sm font-semibold text-fg flex items-center gap-2">
               <Cpu size={16} /> {t('Sobre o Sistema')}

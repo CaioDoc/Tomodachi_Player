@@ -110,6 +110,13 @@ export interface ElectronAPI {
   onAdblockCountUpdated: (callback: (count: number) => void) => () => void;
   setTitleBarOverlay: (opts: { color?: string; symbolColor?: string }) => Promise<{ success: boolean; error?: string }>;
   openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+  updaterGetState: () => Promise<any>;
+  updaterSetAuto: (auto: boolean) => Promise<any>;
+  updaterCheck: () => Promise<any>;
+  updaterDownload: () => Promise<any>;
+  updaterInstall: () => Promise<{ success: boolean }>;
+  updaterOpenReleases: () => Promise<void>;
+  onUpdaterState: (callback: (state: any) => void) => () => void;
   onWebviewOpenUrl: (callback: (payload: { url: string; sourceId: number; background: boolean }) => void) => () => void;
   onAppShortcut: (callback: (payload: { key: string; shift: boolean }) => void) => () => void;
   downloadChapter: (args: { chapterUrl: string; workTitle: string; chapterName: string; pages: string[] }) => Promise<{ success: boolean; error?: string; dir?: string; count?: number }>;
@@ -252,6 +259,17 @@ const electronAPI: ElectronAPI = {
   },
   setTitleBarOverlay: (opts) => ipcRenderer.invoke('window:setTitleBarOverlay', opts),
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+  updaterGetState: () => ipcRenderer.invoke('updater:get-state'),
+  updaterSetAuto: (auto: boolean) => ipcRenderer.invoke('updater:set-auto', auto),
+  updaterCheck: () => ipcRenderer.invoke('updater:check'),
+  updaterDownload: () => ipcRenderer.invoke('updater:download'),
+  updaterInstall: () => ipcRenderer.invoke('updater:install'),
+  updaterOpenReleases: () => ipcRenderer.invoke('updater:open-releases'),
+  onUpdaterState: (callback) => {
+    const handler = (_event: any, st: any) => callback(st);
+    ipcRenderer.on('updater:state', handler);
+    return () => ipcRenderer.removeListener('updater:state', handler);
+  },
   onWebviewOpenUrl: (callback) => {
     const handler = (_event: any, payload: { url: string; sourceId: number; background: boolean }) => callback(payload);
     ipcRenderer.on('webview:open-url', handler);

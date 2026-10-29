@@ -529,3 +529,12 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
   - Séries e filmes: obras da mesma franquia (pelo título) e parecidas (gêneros em comum, nota e época próxima) no Cinemeta.
   - Clicar abre a obra; mangás abrem direto no MangaDex.
 - **MangaDex:** quando a obra não tem capítulos, explica que obras licenciadas costumam ficar sem capítulos lá.
+
+## Atualização automática (1.6.1-beta)
+
+- **Configurações → Sistema & Reset → Atualizações:** chave "Atualizar automaticamente" (ligada por padrão), status, versão atual, "Procurar atualizações" e "Reiniciar e atualizar".
+- **App instalado pelo Setup:** procura versão nova 15 s depois de abrir e a cada 6 h, baixa em segundo plano e instala ao fechar (ou na hora, em "Reiniciar e atualizar"). Usa o GitHub Releases (`electron-updater`), inclusive versões beta.
+- **Com a chave desligada:** ao abrir, só avisa que há versão nova; baixar fica a critério do usuário.
+- **Versão portátil / build local:** não dá para se atualizar sozinha; o app avisa e abre a página de download.
+- Aviso flutuante no canto quando a atualização está pronta ("Reiniciar e atualizar" / "Depois").
+- O GitHub Actions passou a publicar também os arquivos `beta.yml`/`latest.yml` e `.blockmap` que o atualizador usa.
