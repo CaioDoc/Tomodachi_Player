@@ -1,0 +1,8 @@
+Debugger ending on ws://127.0.0.1:55183/403efdc0-60d7-4ad2-81f5-7f956becb33d
+For help, see: https://nodejs.org/en/docs/inspector
+[6744:1029/153127.522:ERROR:interface_endpoint_client.cc(725)] Message 6 rejected by interface blink.mojom.WidgetHost
+[6744:1029/153127.522:ERROR:interface_endpoint_client.cc(725)] Message 7 rejected by interface blink.mojom.WidgetHost
+[6744:1029/153136.185:ERROR:interface_endpoint_client.cc(725)] Message 6 rejected by interface blink.mojom.WidgetHost
+[6744:1029/153136.185:ERROR:interface_endpoint_client.cc(725)] Message 7 rejected by interface blink.mojom.WidgetHost
+Debugger ending on ws://127.0.0.1:50449/cc58d6e2-299e-46de-a020-d3e38fc1fbcf
+For help, see: https://nodejs.org/en/docs/inspector

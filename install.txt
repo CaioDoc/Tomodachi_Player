@@ -1,0 +1,23 @@
+setup.exe: 162080508 bytes, SHA256 BA44D3771548AA015EC1C5AF3C3DCFE09E4B84CFDAB7F96114CD9E51EC97C06E
+NotSigned
+
+
+Platform ServicePack Version      VersionString
+-------- ----------- -------      -------------
+ Win32NT             10.0.26100.0 Microsoft Windows NT 10.0.26100.0
+
+
+Tentativa '/S': código 0 (00000000) em 20 s
+--- Eventos de erro de aplicativo (falhas) ---
+
+TimeCreated : 10/21/2026 9:51:10 PM
+Id          : 1000
+Message     : Performance counters for the WmiApRpl (WmiApRpl) service were loaded successfully. The Record Data in the data section contains the new index values assigned to this service.
+
+TimeCreated : 10/21/2026 9:51:10 PM
+Id          : 1001
+Message     : Performance counters for the WmiApRpl (WmiApRpl) service were removed successfully. The Record Data contains the new values of the system Last Counter and Last Help registry entries.
+
+
+INSTALOU: C:\Users\runneradmin\AppData\Local\Programs\Tomodachi Player\Tomodachi Player.exe
+Executável: C:\Users\runneradmin\AppData\Local\Programs\Tomodachi Player\Tomodachi Player.exe

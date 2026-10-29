@@ -1,0 +1,175 @@
+{
+  "results": [
+    {
+      "name": "Abrir o app",
+      "ok": true,
+      "ms": 2342,
+      "note": "primeira tela em 2.3s"
+    },
+    {
+      "name": "Tela de boas-vindas",
+      "ok": true,
+      "ms": 1462,
+      "note": "aparece e leva ao Descobrir"
+    },
+    {
+      "name": "Descobrir · Animes (AniList)",
+      "ok": true,
+      "ms": 3487,
+      "note": "24 animes carregados"
+    },
+    {
+      "name": "Descobrir · Séries (Cinemeta)",
+      "ok": true,
+      "ms": 3493,
+      "note": "50 séries carregadas"
+    },
+    {
+      "name": "Descobrir · Filmes (Cinemeta)",
+      "ok": true,
+      "ms": 2984,
+      "note": "49 filmes carregados"
+    },
+    {
+      "name": "Busca no Descobrir",
+      "ok": true,
+      "ms": 7437,
+      "note": "6 resultados para \"Breaking Bad\""
+    },
+    {
+      "name": "Página da obra (série)",
+      "ok": true,
+      "ms": 2878,
+      "note": "abriu com temporadas (8 episódios na lista)"
+    },
+    {
+      "name": "Talvez você goste (série)",
+      "ok": true,
+      "ms": 2697,
+      "note": "19 sugestões (Mesma franquia, Parecido)"
+    },
+    {
+      "name": "Tags clicáveis (série → Descobrir)",
+      "ok": true,
+      "ms": 4291,
+      "note": "tag \"Drama\" abriu o Descobrir buscando por ela"
+    },
+    {
+      "name": "Busca por tags no Descobrir (Seinen, Monster)",
+      "ok": true,
+      "ms": 8542,
+      "note": "Buscando por Tag Seinen Texto Monster Separe por vírgula para combinar → 7 animes"
+    },
+    {
+      "name": "Página de anime + Talvez você goste (AniList)",
+      "ok": true,
+      "ms": 7295,
+      "note": "24 sugestões; 1ª: Anterior / 7.6; 15 tags: Action, Adventure, Comedy, Drama, Fantasy, Pirates, Travel, Shounen"
+    },
+    {
+      "name": "Onde assistir (sem fontes instaladas)",
+      "ok": true,
+      "ms": 3758,
+      "note": "painel abre e explica como adicionar fontes"
+    },
+    {
+      "name": "Favoritar em lote",
+      "ok": true,
+      "ms": 7714,
+      "note": "biblioteca: Biblioteca 2"
+    },
+    {
+      "name": "Biblioteca · busca por tags e sem aba Favoritos",
+      "ok": true,
+      "ms": 805,
+      "note": "aba Favoritos: removida; 1 tags sugeridas; filtrando por \"Thriller\": Thriller"
+    },
+    {
+      "name": "Fontes · instalar addon (Anime Kitsu, só catálogo)",
+      "ok": true,
+      "ms": 1907,
+      "note": "instalado"
+    },
+    {
+      "name": "Fontes · Navegar no catálogo do addon",
+      "ok": true,
+      "ms": 6313,
+      "note": "50 capas"
+    },
+    {
+      "name": "Mangás · Explorar MangaDex",
+      "ok": true,
+      "ms": 11830,
+      "note": "12 capas na busca \"Frieren\""
+    },
+    {
+      "name": "Mangás · detalhe e leitura (MangaDex)",
+      "ok": true,
+      "ms": 18416,
+      "note": "CAPÍTULOS DISPONÍVEIS (0); leitor abriu com 1 imagens visíveis"
+    },
+    {
+      "name": "Mangás · Talvez você goste (MangaDex)",
+      "ok": false,
+      "ms": 30101,
+      "note": "locator.waitFor: Timeout 30000ms exceeded."
+    },
+    {
+      "name": "Vídeo local · adicionar pasta e tocar",
+      "ok": true,
+      "ms": 7100,
+      "note": "tocando: 4.9s de 20.0s (pausado=false)"
+    },
+    {
+      "name": "Navegador integrado",
+      "ok": true,
+      "ms": 7737,
+      "note": "abriu nova aba e carregou example.com"
+    },
+    {
+      "name": "Abas · arrastar para reordenar",
+      "ok": true,
+      "ms": 1055,
+      "note": "Mangás & Comics | Animes & Vídeos | Example Domain | Anime Kitsu | ONE PIECE | MONSTERS: 103 Mercies Dragon Damnation | Carrie  →  Carrie | Mangás & Comics | Animes & Vídeos | Example Domain | Anime Kitsu | ONE PIECE | MONSTERS: 103 Mercies Dragon Damnation"
+    },
+    {
+      "name": "Busca global (Ctrl+K)",
+      "ok": true,
+      "ms": 1478,
+      "note": "abre e filtra"
+    },
+    {
+      "name": "Configurações · banner e abas",
+      "ok": true,
+      "ms": 6442,
+      "note": "todas as abas abriram"
+    },
+    {
+      "name": "Botão Doar abre o Ko-fi",
+      "ok": true,
+      "ms": 2335,
+      "note": "https://ko-fi.com/tomodachiplayer"
+    },
+    {
+      "name": "Memória (todos os processos)",
+      "ok": true,
+      "ms": 0,
+      "note": "823 MB"
+    },
+    {
+      "name": "Reabrir · sessão e biblioteca mantidas",
+      "ok": true,
+      "ms": 5700,
+      "note": "8 abas restauradas; Biblioteca 2; abriu em 1.1s"
+    },
+    {
+      "name": "Idioma · English",
+      "ok": true,
+      "ms": 7233,
+      "note": "interface trocou para inglês"
+    }
+  ],
+  "consoleErrors": [
+    "[run1] Failed to load resource: the server responded with a status of 404 ()"
+  ]
+}
