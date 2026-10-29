@@ -48,6 +48,13 @@ async function step(name, fn) {
     log('  ✓', note || '');
   } catch (e) {
     try { await shot(page, 'FALHA-' + name.replace(/[^a-z0-9]+/gi, '-').slice(0, 40)); } catch {}
+    // Fecha painéis/modais que tenham ficado abertos para não travar as próximas etapas
+    try {
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+      const closeDrawer = page.locator('[role=dialog] button[aria-label="Fechar"] >> visible=true');
+      if (await closeDrawer.count()) await closeDrawer.first().click({ timeout: 2000 });
+    } catch {}
     results.push({ name, ok: false, ms: Date.now() - t0, note: String(e?.message || e).split('\n')[0].slice(0, 300) });
     log('  ✗', e?.message);
   }
@@ -189,7 +196,7 @@ await step('Página de anime + Talvez você goste (AniList)', async () => {
 
 await step('Onde assistir (sem fontes instaladas)', async () => {
   await visible(page, 'button:has-text("Assistir")').first().click();
-  await page.locator('text=Onde assistir').first().waitFor({ timeout: 15000 });
+  await page.locator('text=Nenhuma fonte instalada >> visible=true').first().waitFor({ timeout: 15000 });
   await sleep(3000);
   await shot(page, 'onde-assistir-vazio');
   await page.keyboard.press('Escape');
