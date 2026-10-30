@@ -152,7 +152,8 @@ function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<S
       const top = list[0];
       return top ? { url: top.url, referer: top.referer, kind: top.kind } : best;
     };
-    const found = (url: string, referer: string, kind: SniffResult['kind'], weight = 0) => {
+    /** big: tamanho de episódio com certeza (arquivo > 20 MB ou vídeo > 3 min) */
+    const found = (url: string, referer: string, kind: SniffResult['kind'], weight = 0, big = false) => {
       if (done || excluded.has(stripQ(url))) return;
       const hit = { url, referer: referer || pageUrl, kind };
       // HLS/DASH é o melhor sinal (é o episódio inteiro, em partes)
@@ -161,7 +162,7 @@ function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<S
       cands.set(url, { ...hit, weight: Math.max(weight, prev?.weight || 0), order: prev?.order ?? cands.size });
       if (!best) best = hit;
       // Vídeo claramente do tamanho de um episódio (> 20 MB, ou > 3 min de duração): toca já
-      if (!LOOKS_PREVIEW.test(url) && weight >= 20e6) return finish(pickBest());
+      if (big && !LOOKS_PREVIEW.test(url)) return finish(pickBest());
       // Senão espera um pouco por outros vídeos (um m3u8, ou o mp4 grande do episódio) antes de escolher
       if (!mp4Timer) mp4Timer = setTimeout(() => finish(pickBest()), 2500);
     };
@@ -190,7 +191,8 @@ function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<S
         // Tamanho do arquivo (Content-Length, ou o total do Content-Range): o episódio é o arquivo grande
         const len = Number((h['content-length'] || h['Content-Length'] || [])[0] || 0);
         const total = Number((((h['content-range'] || h['Content-Range'] || [])[0] || '').split('/')[1]) || 0);
-        if (kind && (ct || MEDIA_EXT.test(details.url))) found(details.url, details.referrer || '', kind, Math.max(len, total));
+        const bytes = Math.max(len, total);
+        if (kind && (ct || MEDIA_EXT.test(details.url))) found(details.url, details.referrer || '', kind, bytes, bytes >= 20e6);
       }
       callback({});
     });
@@ -205,7 +207,8 @@ function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<S
             const src = String(v?.src || '');
             if (!src || NOT_THE_VIDEO.test(src)) continue;
             // Peso pela duração (um episódio de 20 min "pesa" mais que qualquer prévia)
-            found(src, frame.url || pageUrl, classify(src) || 'mp4', Number(v?.dur || 0) * 1e6 + Number(v?.area || 0));
+            const dur = Number(v?.dur || 0);
+            found(src, frame.url || pageUrl, classify(src) || 'mp4', dur * 1e6 + Number(v?.area || 0), dur >= 180);
           }
         } catch {
           /* frame fechou ou bloqueou */
