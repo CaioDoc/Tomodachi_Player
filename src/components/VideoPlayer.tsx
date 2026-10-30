@@ -324,6 +324,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [extractFailed, setExtractFailed] = useState<string | null>(null);
   const [extractTry, setExtractTry] = useState(0);
   const [extractStartedAt, setExtractStartedAt] = useState(0);
+  // Vídeos da página que não abriram no player: "Tentar de novo" procura outro
+  const skipUrlsRef = useRef<string[]>([]);
   const [, setTick] = useState(0);
   // HLS (m3u8) toca direto no player com o hls.js: começa em ~1 s e permite avançar/voltar sem conversão
   const [hlsSource, setHlsSource] = useState<{ url: string; referer?: string } | null>(null);
@@ -473,7 +475,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return null;
   }, [metadata, activeVideoPath]);
 
+  const lastPathRef = useRef('');
   useEffect(() => {
+    if (lastPathRef.current !== activeVideoPath) {
+      lastPathRef.current = activeVideoPath;
+      skipUrlsRef.current = [];
+    }
     setTranscode(false);
     setError(null);
     setTranscodedUrl(null);
@@ -517,7 +524,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setIsExtracting(true);
       setExtractStartedAt(Date.now());
       window.electronAPI
-        .extractVideoStream(activeVideoPath)
+        .extractVideoStream(activeVideoPath, undefined, { exclude: skipUrlsRef.current, fresh: extractTry > 0 })
         .then(async (res) => {
           if (!alive) return;
           const extractedUrl = res?.streamUrl || res?.url;
@@ -756,6 +763,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
       setTranscode(true);
     } else if (v.error) {
+      // Vídeo achado numa página que nem o FFmpeg abriu: avisa no player e deixa procurar outro
+      if (isWebUrl && extractedMedia?.url) {
+        if (!skipUrlsRef.current.includes(extractedMedia.url)) skipUrlsRef.current = [...skipUrlsRef.current, extractedMedia.url];
+        setExtractedMedia(null);
+        setTranscodedUrl(null);
+        setError(null);
+        setExtractFailed(t('O vídeo achado na página não abriu no player.'));
+        return;
+      }
       setError(MEDIA_ERRORS[v.error.code] || t('Erro de reprodução ({code})', { code: v.error.code }));
     }
   };
@@ -1388,7 +1404,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 onClick={() => setExtractTry((n) => n + 1)}
                 className="h-9 px-4 rounded-md bg-subtle hover:bg-elevated border border-line text-[12.5px] text-fg inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <RefreshCw size={14} /> {t('Tentar de novo')}
+                <RefreshCw size={14} /> {skipUrlsRef.current.length ? t('Procurar outro vídeo na página') : t('Tentar de novo')}
               </button>
               {!!currentEpisodeUrl && (
                 <button

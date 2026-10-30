@@ -5,7 +5,7 @@
 // O usuário não precisa saber de onde vem cada link.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Puzzle, Loader2, ChevronLeft, ChevronRight, ChevronDown, Play, RefreshCw, Plus, Globe, Zap, Pencil, Search, Check, SlidersHorizontal } from 'lucide-react';
+import { Puzzle, Loader2, ChevronLeft, ChevronRight, ChevronDown, Play, RefreshCw, Plus, Globe, Zap, Pencil, Search, SlidersHorizontal, X } from 'lucide-react';
 import {
   animeExtensionsFor,
   searchInExtension,
@@ -57,17 +57,29 @@ function readOff(): Set<string> {
     return new Set();
   }
 }
-function setExtOn(pkg: string, on: boolean) {
-  const off = readOff();
-  if (on) off.delete(pkg);
-  else off.add(pkg);
+const CHOSEN_KEY = 'tp_watch_ext_chosen';
+function writeOff(off: Set<string>) {
   try {
     localStorage.setItem(OFF_KEY, JSON.stringify([...off]));
+    localStorage.setItem(CHOSEN_KEY, '1');
   } catch {
     /* ignore */
   }
   window.dispatchEvent(new CustomEvent(EXT_TOGGLE_EVENT));
 }
+function setExtOn(pkg: string, on: boolean) {
+  const off = readOff();
+  if (on) off.delete(pkg);
+  else off.add(pkg);
+  writeOff(off);
+}
+const neverChose = () => {
+  try {
+    return !localStorage.getItem(CHOSEN_KEY) && !localStorage.getItem(OFF_KEY);
+  } catch {
+    return false;
+  }
+};
 
 /* Obra já achada em cada site: o próximo episódio não precisa buscar de novo */
 const MATCH_KEY = 'tp_watch_match_cache';
@@ -121,7 +133,9 @@ const ExtensionCard: React.FC<{
   episode: number;
   onPlay: (ext: InstalledExtension, ep: ExtensionEpisode | null, match: ExtensionMatch) => void;
   onPicked?: (match: ExtensionMatch | null) => void;
-}> = ({ ext, state, req, episode, onPlay, onPicked }) => {
+  /** Para de buscar neste site (fica salvo) */
+  onSkip?: () => void;
+}> = ({ ext, state, req, episode, onPlay, onPicked, onSkip }) => {
   const [picked, setPicked] = useState<ExtensionMatch | null>(null);
   const [eps, setEps] = useState<ExtensionEpisode[] | null>(null);
   const [loadingEps, setLoadingEps] = useState(false);
@@ -169,6 +183,17 @@ const ExtensionCard: React.FC<{
             </>
           ) : picked ? null : (
             tn(state.matches.length, '{n} resultado', '{n} resultados')
+          )}
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="ml-1 p-0.5 rounded text-fg-muted hover:text-fg hover:bg-subtle cursor-pointer"
+              title={t('Não buscar neste site (fica salvo; dá para religar em "Escolher sites")')}
+              aria-label={t('Não buscar em {site}', { site: ext.name })}
+            >
+              <X size={12} />
+            </button>
           )}
         </span>
       </div>
@@ -270,9 +295,15 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
     return () => window.removeEventListener(EXT_TOGGLE_EVENT, on);
   }, []);
   const exts = useMemo(() => allExts.filter((e) => !off.has(e.pkg)), [allExts, off]);
+  // Site desligado no meio da busca: para de buscar nele na hora
+  useEffect(() => {
+    for (const pkg of off) if (signals.current[pkg]) signals.current[pkg].cancelled = true;
+  }, [off]);
   const [states, setStates] = useState<Record<string, ExtState>>({});
   const [showEmpty, setShowEmpty] = useState(false);
-  const [choosing, setChoosing] = useState(false);
+  // Muitos sites e nenhuma escolha feita ainda: já mostra a lista para marcar/desmarcar
+  const [choosing, setChoosing] = useState(() => animeExtensionsFor(req).length > 5 && neverChose());
+  const signals = useRef<Record<string, { cancelled: boolean }>>({});
   const reqRef = useRef(req);
   reqRef.current = req;
   const searched = useRef<Set<string>>(new Set());
@@ -298,8 +329,12 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
       const worker = async () => {
         while (queue.length) {
           const ext = queue.shift()!;
+          const signal = { cancelled: false };
+          signals.current[ext.pkg] = signal;
+          if (readOff().has(ext.pkg)) continue;
           try {
-            const matches = await searchInExtension(ext, req);
+            const matches = await searchInExtension(ext, req, signal);
+            if (signal.cancelled) continue;
             if (reqRef.current !== req) return;
             setStates((s) => ({ ...s, [ext.pkg]: { status: 'done', matches } }));
           } catch (err: any) {
@@ -308,7 +343,8 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
           }
         }
       };
-      await Promise.all([worker(), worker(), worker()]);
+      // Vários sites ao mesmo tempo (cada um é um servidor diferente)
+      await Promise.all(Array.from({ length: Math.min(6, Math.max(1, queue.length)) }, () => worker()));
     },
     [req, allExts]
   );
@@ -359,64 +395,61 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
         title={t('Sites')}
         hint={t('extensões')}
         right={
-          <span className="inline-flex items-center gap-1">
-            {allExts.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setChoosing((v) => !v)}
-                className={`h-6 px-2 rounded text-[11px] inline-flex items-center gap-1 cursor-pointer ${choosing ? 'bg-accent/15 text-fg' : 'text-fg-muted hover:text-fg hover:bg-subtle'}`}
-                title={t('Escolher em quais sites buscar')}
-                aria-expanded={choosing}
-              >
-                <SlidersHorizontal size={12} /> {off.size ? t('{n} de {total} sites', { n: allExts.length - off.size, total: allExts.length }) : t('Escolher sites')}
-              </button>
-            )}
-            <button type="button" onClick={() => void searchAll()} className="p-1 rounded text-fg-muted hover:text-fg hover:bg-subtle cursor-pointer" title={t('Buscar de novo')} aria-label={t('Buscar de novo')}>
-              <RefreshCw size={12} />
-            </button>
-          </span>
+          <button type="button" onClick={() => void searchAll()} className="p-1 rounded text-fg-muted hover:text-fg hover:bg-subtle cursor-pointer" title={t('Buscar de novo')} aria-label={t('Buscar de novo')}>
+            <RefreshCw size={12} />
+          </button>
         }
       />
-      {(choosing || off.size > 0) && (
-        <div className="px-4 pb-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] text-fg-muted">{t('Buscar nestes sites (fica salvo para os próximos episódios):')}</span>
-            {choosing && (
-              <button type="button" onClick={() => setChoosing(false)} className="text-[11px] text-accent hover:underline cursor-pointer">
-                {t('Pronto')}
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {allExts.map((e) => {
-              const on = !off.has(e.pkg);
-              return (
-                <button
-                  key={e.pkg}
-                  type="button"
-                  role="checkbox"
-                  aria-checked={on}
-                  onClick={() => setExtOn(e.pkg, !on)}
-                  title={on ? t('Clique para não buscar neste site') : t('Clique para buscar neste site')}
-                  className={`h-7 pl-1.5 pr-2.5 rounded-full text-[11.5px] inline-flex items-center gap-1.5 cursor-pointer border transition-colors ${
-                    on ? 'bg-accent/15 border-accent/45 text-fg' : 'bg-subtle border-line-subtle text-fg-muted line-through'
-                  }`}
-                >
-                  <span className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center ${on ? 'bg-accent border-accent text-accent-fg' : 'border-line'}`}>
-                    {on && <Check size={10} strokeWidth={3} />}
-                  </span>
-                  {e.name}
+      {allExts.length > 1 && (
+        <div className="mx-3 mb-2 rounded-lg border border-accent/30 bg-accent/5" data-testid="site-chooser">
+          <button type="button" onClick={() => setChoosing((v) => !v)} aria-expanded={choosing} className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer">
+            <SlidersHorizontal size={13} className="text-accent shrink-0" />
+            <span className="text-[12px] text-fg">{t('Buscando em {n} de {total} sites', { n: allExts.length - [...off].filter((p) => allExts.some((e) => e.pkg === p)).length, total: allExts.length })}</span>
+            <span className="ml-auto text-[11.5px] text-accent font-semibold inline-flex items-center gap-0.5">
+              {choosing ? t('Fechar') : t('Escolher sites')} {choosing ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </span>
+          </button>
+          {choosing && (
+            <div className="px-3 pb-3">
+              <p className="text-[11px] text-fg-muted mb-2">{t('Marque só os sites onde quer procurar. Menos sites = busca mais rápida. A escolha fica salva para os próximos episódios e obras.')}</p>
+              <div className="flex items-center gap-3 mb-2 text-[11.5px]">
+                <button type="button" onClick={() => writeOff(new Set())} className="text-accent hover:underline cursor-pointer">
+                  {t('Marcar todos')}
                 </button>
-              );
-            })}
-          </div>
+                <button type="button" onClick={() => writeOff(new Set(allExts.map((e) => e.pkg)))} className="text-fg-muted hover:text-fg hover:underline cursor-pointer">
+                  {t('Desmarcar todos')}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-1 max-h-64 overflow-y-auto pr-1">
+                {allExts.map((e) => {
+                  const on = !off.has(e.pkg);
+                  return (
+                    <label key={e.pkg} className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-[12px] ${on ? 'bg-surface text-fg' : 'text-fg-muted hover:bg-subtle'}`}>
+                      <input type="checkbox" checked={on} onChange={() => setExtOn(e.pkg, !on)} className="accent-accent w-3.5 h-3.5 cursor-pointer" />
+                      <span className="truncate">{e.name}</span>
+                      <span className="ml-auto text-[9.5px] uppercase font-mono text-fg-muted">{e.lang}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
       {exts.length === 0 && <p className="px-4 pb-2 text-[12px] text-fg-muted">{t('Todos os sites estão desligados. Ligue algum acima para buscar.')}</p>}
       {list
         .filter((x) => x.state.status !== 'idle')
         .map(({ ext, state }) => (
-          <ExtensionCard key={ext.pkg} ext={ext} req={req} episode={episode} state={state} onPlay={play} onPicked={(m) => rememberMatch(req, ext.pkg, m)} />
+          <ExtensionCard
+            key={ext.pkg}
+            ext={ext}
+            req={req}
+            episode={episode}
+            state={state}
+            onPlay={play}
+            onPicked={(m) => rememberMatch(req, ext.pkg, m)}
+            onSkip={allExts.length > 1 ? () => setExtOn(ext.pkg, false) : undefined}
+          />
         ))}
       {exts.length > 0 && searching === 0 && found === 0 && <p className="px-4 pb-2 text-[12px] text-fg-muted">{t('Nenhum site encontrou “{title}”.', { title: req.title })}</p>}
       {empty.length > 0 && found > 0 && (

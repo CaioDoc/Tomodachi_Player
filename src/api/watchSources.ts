@@ -4,6 +4,7 @@
 //  - Plugins (Nuvio): acha a obra no catálogo (Cinemeta) e roda os plugins/addons.
 
 import { searchSite, siteEpisodeLinks } from './siteSearch';
+import { t } from '../i18n';
 import { getAnimeSources, type InstalledExtension } from './extensionRegistry';
 import { fetchChapterList } from './chapterList';
 import { fetchJson, nuvioCatalog, nuvioMeta, type NuvioMeta, type NuvioMetaPreview, type NuvioType } from './nuvio';
@@ -123,8 +124,8 @@ export function cleanSearchTitle(raw: string): string {
     .trim();
 }
 
-/** Consultas a tentar, da mais exata para a mais curta */
-export function searchQueries(req: Pick<WatchRequest, 'title' | 'altTitles'>, max = 6): string[] {
+/** Consultas a tentar, da mais exata para a mais curta (nomes alternativos antes das versões cortadas) */
+export function searchQueries(req: Pick<WatchRequest, 'title' | 'altTitles'>, max = 4): string[] {
   const out: string[] = [];
   const push = (q?: string) => {
     const v = String(q || '').trim();
@@ -132,15 +133,13 @@ export function searchQueries(req: Pick<WatchRequest, 'title' | 'altTitles'>, ma
     if (out.some((o) => normTitle(o) === normTitle(v))) return;
     out.push(v);
   };
-  const all = [req.title, ...(req.altTitles || [])];
+  const all = [req.title, ...(req.altTitles || [])].filter(Boolean);
+  // 1) cada nome, limpo (sem "Dublado", (TV), [..])
+  for (const tt of all) push(cleanSearchTitle(tt));
+  // 2) sem o subtítulo (depois de ":" / " - ") e sem a marca de temporada
   for (const tt of all) {
     const c = cleanSearchTitle(tt);
-    push(c);
-    push(tt);
-    // Sem a parte depois de ":" / " - " (subtítulo)
-    const base = c.split(/\s*[:–—]\s*|\s+-\s+/)[0];
-    push(base);
-    // Sem a marca de temporada ("Jujutsu Kaisen 2nd Season" → "Jujutsu Kaisen")
+    push(c.split(/\s*[:–—]\s*|\s+-\s+/)[0]);
     push(coreWords(c).join(' '));
   }
   return out.slice(0, max);
@@ -240,15 +239,16 @@ const baseUrlOf = (ext: InstalledExtension) => {
 };
 
 /** Procura a obra numa extensão (tenta o título completo, versões limpas e os nomes alternativos) */
-export async function searchInExtension(ext: InstalledExtension, req: WatchRequest): Promise<ExtensionMatch[]> {
+export async function searchInExtension(ext: InstalledExtension, req: WatchRequest, signal?: { cancelled: boolean }): Promise<ExtensionMatch[]> {
   const api = window.electronAPI;
   const titles = [req.title, ...(req.altTitles || [])].filter(Boolean);
-  const queries = searchQueries(req, 7);
+  const queries = searchQueries(req, 4);
   const seen = new Map<string, ExtensionMatch>();
   const scoreOf = (title: string, isEpisode: boolean) => bestScore(titles, title) * (isEpisode ? 0.85 : 1);
   let lastError: unknown = null;
   let anyOk = false;
   for (const query of queries) {
+    if (signal?.cancelled) break;
     try {
       if (api?.siteFetchHtml) {
         // Busca como uma pessoa no site: formulário de busca do site + leitura dos cards
@@ -271,20 +271,67 @@ export async function searchInExtension(ext: InstalledExtension, req: WatchReque
       lastError = err;
     }
     // Achou algo bem parecido: não precisa tentar as outras consultas
-    if ([...seen.values()].some((m) => m.score >= 0.75)) break;
+    const top = Math.max(0, ...[...seen.values()].map((m) => m.score));
+    if (top >= 0.75 || (top >= 0.5 && queries.indexOf(query) >= 1)) break;
   }
   if (!anyOk && lastError) throw lastError;
   return [...seen.values()].filter((m) => m.score >= 0.3).sort((a, b) => b.score - a.score).slice(0, 6);
 }
 
+/* ───────────── Episódios (sites de vídeo) ───────────── */
+
+const EP_TEXT = /(?:epis[oó]dio|episode|\bep\.?|\be)\s*[#:.-]?\s*0*(\d{1,4}(?:\.\d)?)\b/i;
+const EP_URL = /(?:episodio|episode|\bep)[-_/]?0*(\d{1,4}(?:\.\d)?)(?:[-_/.?#]|$)/i;
+
+/** Número do episódio escrito no nome ou no endereço (null se não tiver um claro) */
+export function episodeNumberOf(name: string, url: string): number | null {
+  const m = String(name || '').match(EP_TEXT) || String(url || '').match(EP_URL);
+  if (m) {
+    const n = Number(m[1]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  // Botões só com o número ("01", "12")
+  const plain = String(name || '').trim().match(/^0*(\d{1,4})$/);
+  return plain ? Number(plain[1]) : null;
+}
+
+/** Nome curto: "Episódio 3" (+ subtítulo curto, se houver), sem repetir o nome da obra */
+export function episodeLabel(name: string, n: number): string {
+  const after = String(name || '')
+    .replace(/[\s\S]*?(?:epis[oó]dio|episode|\bep\.?)\s*[#:.-]?\s*0*\d{1,4}(?:\.\d)?\b/i, '')
+    .replace(/^[\s:–—|-]+/, '')
+    .replace(/\b(dublado|legendado|dub|sub|online|hd|fhd|1080p|720p)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const base = t('Episódio {n}', { n });
+  return after && after.length <= 40 && !/^\d+$/.test(after) ? `${base} · ${after}` : base;
+}
+
+/**
+ * Lista de episódios da página de uma obra num site de vídeo.
+ * 1) links "Episódio N" da página; 2) leitor genérico, mas só com o que tem número de episódio claro
+ * (sem isso ele pegava obras relacionadas e números aleatórios, como views ou ano).
+ */
+export async function videoEpisodes(url: string, sourceName = ''): Promise<ExtensionEpisode[]> {
+  let raw: Array<{ url: string; name: string; number?: number }> = [];
+  if (window.electronAPI?.siteFetchHtml) raw = await siteEpisodeLinks(url).catch(() => []);
+  if (!raw.length) {
+    const generic = await fetchChapterList(url, sourceName, url).catch(() => []);
+    const withNumber = generic.filter((c) => c?.url && episodeNumberOf(c.name || '', c.url) != null);
+    // Só confia no leitor genérico quando a maioria dos links tem número de episódio
+    if (withNumber.length && withNumber.length >= generic.length / 2) raw = withNumber.map((c) => ({ url: c.url, name: c.name || '' }));
+  }
+  const byNumber = new Map<number, ExtensionEpisode>();
+  for (const c of raw) {
+    const n = episodeNumberOf(c.name, c.url) ?? c.number ?? null;
+    if (n == null || byNumber.has(n)) continue;
+    byNumber.set(n, { url: c.url, name: episodeLabel(c.name, n), number: n });
+  }
+  return Array.from(byNumber.values()).sort((a, b) => a.number - b.number);
+}
+
 export async function extensionEpisodes(ext: InstalledExtension, url: string): Promise<ExtensionEpisode[]> {
-  let list = await fetchChapterList(url, ext.sourceName || ext.name, url).catch(() => []);
-  // Não achou episódios do jeito de sempre: procura os links "Episódio N" na página
-  if (!list.length && window.electronAPI?.siteFetchHtml) list = (await siteEpisodeLinks(url).catch(() => [])) as typeof list;
-  return list
-    .filter((c) => c?.url)
-    .map((c, i) => ({ url: c.url, name: c.name || '', number: Number(c.number) || i + 1 }))
-    .sort((a, b) => a.number - b.number);
+  return videoEpisodes(url, ext.sourceName || ext.name);
 }
 
 /* ───────────── Plugins (Nuvio) ───────────── */

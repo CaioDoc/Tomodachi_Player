@@ -22,8 +22,7 @@ import type { LibraryItem, LibraryChapter } from './MihonLibrary';
 import { readLibrary, updateLibrary } from '../utils/libraryStore';
 import { PROGRESS_EVENT, mergeChapterProgress, updateChapterProgress, getVideoPositionInfo } from '../utils/progress';
 import { openVideoEpisode, chapterDisplayName } from '../api/openChapter';
-import { openWatchSources } from '../api/watchSources';
-import { fetchChapterList } from '../api/chapterList';
+import { openWatchSources, videoEpisodes } from '../api/watchSources';
 import { getResume, CONTINUE_EVENT } from '../utils/continueWatching';
 import { Loader2 } from 'lucide-react';
 import { FavoriteTagModal } from './FavoriteTagModal';
@@ -118,11 +117,10 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
     triedEps.current = true;
     setLoadingEps(true);
     setEpsError(null);
-    fetchChapterList(url, anime.sourceName || '', url)
+    // Leitor próprio de episódios de sites de vídeo (número e nome curtos e certos)
+    videoEpisodes(url, anime.sourceName || '')
       .then((list) => {
-        const eps = list
-          .filter((c) => c?.url)
-          .map((c, i) => ({ url: c.url, name: c.name || t('Episódio {n}', { n: Number(c.number) || i + 1 }), number: Number(c.number) || i + 1, read: false, bookmark: false, lastPageRead: 0, lastSecondSeen: 0, lastModifiedAt: Date.now() }));
+        const eps = list.map((c) => ({ url: c.url, name: c.name, number: c.number, read: false, bookmark: false, lastPageRead: 0, lastSecondSeen: 0, lastModifiedAt: Date.now() }));
         setEpisodes(mergeChapterProgress(eps as LibraryChapter[], 'video'));
       })
       .catch((err) => setEpsError(String(err?.message || err)))

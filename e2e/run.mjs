@@ -40,10 +40,18 @@ http
     if (u.pathname.startsWith('/anime/')) {
       const slug = u.pathname.split('/')[2];
       const eps = [1, 2, 3].map((n) => `<li><a href="/episodio/${slug}-episodio-${n}">Episódio ${n}</a></li>`).join('');
-      return html(nav + `<main><h1>Tomodachi Teste</h1><ul class="episodios">${eps}</ul></main>`);
+      // Barra lateral com episódios de OUTRA obra e "39 views": não podem entrar na lista
+      return html(nav + `<main><h1>Tomodachi Teste</h1><ul class="episodios">${eps}</ul><div class="post-meta"><a href="/anime/${slug}">Tomodachi Teste</a> 39 views</div></main><aside class="sidebar"><h3>Recentes</h3><a href="/episodio/outro-anime-episodio-39">Outro Anime Episódio 39</a></aside>`);
     }
-    if (u.pathname.startsWith('/episodio/')) return html(nav + `<main><h1>Episódio</h1><iframe src="/player/1" width="800" height="450"></iframe></main>`);
+    // Página do episódio: o vídeo fica num iframe de player; ao lado, a prévia em vídeo de outra obra
+    if (u.pathname.startsWith('/episodio/')) return html(nav + `<main><h1>Episódio</h1><iframe src="/player/1" width="800" height="450"></iframe></main><aside class="sidebar"><a href="/anime/outro"><video muted autoplay loop src="/media/preview-outro.mp4" width="160"></video>Outro Anime</a></aside>`);
     if (u.pathname.startsWith('/player/')) return html('<div class="player"><video controls preload="auto" src="/media/sample.mp4"></video></div>');
+    if (u.pathname === '/media/preview-outro.mp4' && SAMPLE && fs.existsSync(SAMPLE)) {
+      // Prévia curta (pedaço pequeno do arquivo)
+      const buf = fs.readFileSync(SAMPLE).subarray(0, 120000);
+      res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': buf.length });
+      return res.end(buf);
+    }
     if (u.pathname === '/media/sample.mp4' && SAMPLE && fs.existsSync(SAMPLE)) {
       const size = fs.statSync(SAMPLE).size;
       const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
@@ -448,8 +456,10 @@ await step('Assistir · nunca mostra o site: acha o vídeo ou avisa', async () =
 
 await step('Extensão (site) · acha a obra pela busca do site e toca o episódio no player do app', async () => {
   await page.evaluate((base) => {
-    const list = JSON.parse(localStorage.getItem('installed_extensions') || '[]').filter((e) => e.pkg !== 'test.site');
+    const list = JSON.parse(localStorage.getItem('installed_extensions') || '[]').filter((e) => e.pkg !== 'test.site' && e.pkg !== 'test.dead');
     list.push({ pkg: 'test.site', name: 'Site Teste', sourceName: 'Site Teste', baseUrl: base, type: 'anime', lang: 'pt' });
+    // Um site fora do ar não pode travar nem atrasar a busca
+    list.push({ pkg: 'test.dead', name: 'Site Fora do Ar', sourceName: 'Site Fora do Ar', baseUrl: 'http://127.0.0.1:47899', type: 'anime', lang: 'pt' });
     localStorage.setItem('installed_extensions', JSON.stringify(list));
     window.dispatchEvent(new Event('extensions:updated'));
   }, SITE);
@@ -470,7 +480,12 @@ await step('Extensão (site) · acha a obra pela busca do site e toca o episódi
   await visible(page, 'button:has-text("Assistir")').first().click();
   const playEp = page.locator('[role=dialog] button:has-text("Assistir episódio 1") >> visible=true').first();
   await playEp.waitFor({ timeout: 60000 });
+  await sleep(1500);
   await shot(page, 'site-teste-onde-assistir');
+  const chooser = await page.locator('[data-testid=site-chooser] >> visible=true').count();
+  const epButtons = (await page.locator('[role=dialog] .flex-wrap button.tabular-nums >> visible=true').allInnerTexts()).map((x) => x.trim());
+  if (!chooser) throw new Error('a escolha de sites não aparece no Onde assistir');
+  if (epButtons.join(',') !== '1,2,3') throw new Error('episódios errados na lista: ' + epButtons.join(','));
   const t0 = Date.now();
   await playEp.click();
   // O vídeo do episódio (que está dentro de um iframe do player do site) toca no player do app
@@ -491,8 +506,9 @@ await step('Extensão (site) · acha a obra pela busca do site e toca o episódi
   await goTab('Descobrir');
   await page.locator('input[placeholder*="ex."] >> visible=true').first().fill('');
   if (webviews) throw new Error('abriu o site num navegador');
+  if (!/sample\.mp4/.test(String(info?.src))) throw new Error('tocou a prévia em vez do episódio: ' + info?.src);
   if (!/test\.site/.test(cached)) throw new Error('não guardou a obra achada no site (o próximo episódio buscaria de novo)');
-  return `tocou em ${secs}s pelo player do app (${String(info?.src).slice(0, 60)})`;
+  return `escolha de sites visível; episódios ${epButtons.join(',')}; tocou em ${secs}s pelo player do app (${String(info?.src).slice(0, 60)})`;
 });
 
 await step('Onde assistir · desligar um site fica salvo', async () => {

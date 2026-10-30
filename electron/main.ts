@@ -1047,7 +1047,7 @@ function unpackPackedJs(html: string): string | null {
 }
 
 // Extrator de stream de vídeo direto ou player embed para reprodução na plataforma sem erros de codec
-async function extractVideoStreamNow(pageUrl: string): Promise<{
+async function extractVideoStreamNow(pageUrl: string, opts: { exclude?: string[] } = {}): Promise<{
   success: boolean;
   type?: 'stream' | 'embed';
   streamUrl?: string;
@@ -1064,7 +1064,8 @@ async function extractVideoStreamNow(pageUrl: string): Promise<{
 
   // A leitura rápida da página e a captura na rede começam juntas: vale a que achar primeiro
   const signal = { cancelled: false };
-  const sniffing = sniffMedia(pageUrl, { signal }).catch(() => null);
+  const sniffing = sniffMedia(pageUrl, { signal, exclude: opts.exclude }).catch(() => null);
+  const skip = new Set((opts.exclude || []).map((u) => u.split(/[?#]/)[0]));
   const done = <T,>(r: T): T => {
     signal.cancelled = true;
     return r;
@@ -1083,12 +1084,12 @@ async function extractVideoStreamNow(pageUrl: string): Promise<{
     const html = res.data;
     if (typeof html === 'string') {
       const videoSrcMatch = html.match(/<video[^>]+src="([^">]+)"/i) || html.match(/<source[^>]+src="([^">]+)"/i);
-      if (videoSrcMatch && /^https?:\/\//i.test(videoSrcMatch[1])) {
+      if (videoSrcMatch && /^https?:\/\//i.test(videoSrcMatch[1]) && !skip.has(videoSrcMatch[1].split(/[?#]/)[0])) {
         return done({ success: true, type: 'stream', streamUrl: videoSrcMatch[1], url: videoSrcMatch[1], referer: pageUrl, kind: /m3u8/i.test(videoSrcMatch[1]) ? 'hls' : 'mp4' });
       }
 
       const mediaMatch = html.match(/https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8)(?:\?[^\s"'<>]*)?/i);
-      if (mediaMatch && !mediaMatch[0].includes('analytics') && !mediaMatch[0].includes('track') && !mediaMatch[0].includes('smartpop')) {
+      if (mediaMatch && !skip.has(mediaMatch[0].split(/[?#]/)[0]) && !/analytics|track|smartpop|preview|thumb|trailer|teaser|sprite/i.test(mediaMatch[0])) {
         return done({ success: true, type: 'stream', streamUrl: mediaMatch[0], url: mediaMatch[0], referer: pageUrl, kind: /m3u8/i.test(mediaMatch[0]) ? 'hls' : 'mp4' });
       }
 
@@ -1187,12 +1188,13 @@ const EXTRACT_TTL = 20 * 60 * 1000;
 const extractCache = new Map<string, { at: number; result: Awaited<ReturnType<typeof extractVideoStreamNow>> }>();
 const extracting = new Map<string, ReturnType<typeof extractVideoStreamNow>>();
 
-async function extractVideoStream(pageUrl: string) {
+async function extractVideoStream(pageUrl: string, opts: { exclude?: string[]; fresh?: boolean } = {}) {
+  const special = opts.fresh || (opts.exclude && opts.exclude.length > 0);
   const hit = extractCache.get(pageUrl);
-  if (hit && Date.now() - hit.at < EXTRACT_TTL) return hit.result;
+  if (!special && hit && Date.now() - hit.at < EXTRACT_TTL) return hit.result;
   const running = extracting.get(pageUrl);
-  if (running) return running;
-  const job = extractVideoStreamNow(pageUrl)
+  if (!special && running) return running;
+  const job = extractVideoStreamNow(pageUrl, { exclude: opts.exclude })
     .then((result) => {
       if (result.success) {
         extractCache.set(pageUrl, { at: Date.now(), result });
@@ -1525,8 +1527,8 @@ function setupIpcHandlers() {
   });
 
   // Extração de streaming ou embed de vídeo para reproduzir diretamente na plataforma
-  ipcMain.handle('video:extractStream', async (_, { pageUrl, sourceName }: { pageUrl: string; sourceName?: string }) => {
-    return await extractVideoStream(pageUrl);
+  ipcMain.handle('video:extractStream', async (_, { pageUrl, exclude, fresh }: { pageUrl: string; sourceName?: string; exclude?: string[]; fresh?: boolean }) => {
+    return await extractVideoStream(pageUrl, { exclude: Array.isArray(exclude) ? exclude.map(String).slice(0, 20) : undefined, fresh: !!fresh });
   });
 
   // Scraping direto e autêntico do catálogo online da extensão (ex: Jav Guru, BetterAnime, etc.)

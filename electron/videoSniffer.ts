@@ -41,9 +41,11 @@ const PLAY_SCRIPT = `(() => {
       '.playbutton', '.play-btn', '.btn-play', '.play-button', 'button[class*="play" i]', 'div[class*="play" i][role="button"]', '[aria-label*="play" i]'];
     for (const s of sel) { const el = document.querySelector(s); if (el) { el.click(); break; } }
     for (const v of document.querySelectorAll('video')) { v.muted = true; const p = v.play && v.play(); if (p && p.catch) p.catch(() => {}); }
-    const src = [...document.querySelectorAll('video')].map((v) => v.currentSrc || v.src).find((u) => /^https?:/i.test(u || ''));
-    return src || null;
-  } catch { return null; }
+    // Todos os <video> com endereço de verdade, com duração e tamanho na tela (o episódio é o maior/mais longo)
+    return [...document.querySelectorAll('video')]
+      .map((v) => ({ src: v.currentSrc || v.src, dur: isFinite(v.duration) ? v.duration : 0, area: v.clientWidth * v.clientHeight }))
+      .filter((x) => /^https?:/i.test(x.src || ''));
+  } catch { return []; }
 })()`;
 
 // Até 2 buscas ao mesmo tempo (ex.: o episódio atual e o próximo, pré-carregado), cada uma numa
@@ -68,6 +70,8 @@ function releaseSlot(slot: string) {
 }
 
 export interface SniffOptions {
+  /** Endereços que já falharam no player (procura outro vídeo na página) */
+  exclude?: string[];
   timeoutMs?: number;
   referer?: string;
   /** Cancela a busca (ex.: outra forma já achou o vídeo) */
@@ -133,18 +137,34 @@ function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<S
       resolve(r);
     };
 
-    const found = (url: string, referer: string, kind: SniffResult['kind']) => {
-      if (done) return;
+    // Vídeos achados; o escolhido é o episódio: HLS/DASH na hora; entre mp4, o maior/mais longo
+    // (prévias de outras obras, trailers e anúncios costumam ser curtos/pequenos)
+    const cands = new Map<string, SniffResult & { weight: number; order: number }>();
+    const stripQ = (u: string) => u.split(/[?#]/)[0];
+    const excluded = new Set((opts.exclude || []).map(stripQ));
+    const LOOKS_PREVIEW = /preview|thumb|trailer|teaser|sample|promo|sprite|\/ads?[/_-]|banner|intro\b/i;
+    const pickBest = (): SniffResult | null => {
+      const list = [...cands.values()].sort((a, b) => {
+        const pa = LOOKS_PREVIEW.test(a.url) ? 1 : 0;
+        const pb = LOOKS_PREVIEW.test(b.url) ? 1 : 0;
+        return pa - pb || b.weight - a.weight || a.order - b.order;
+      });
+      const top = list[0];
+      return top ? { url: top.url, referer: top.referer, kind: top.kind } : best;
+    };
+    const found = (url: string, referer: string, kind: SniffResult['kind'], weight = 0) => {
+      if (done || excluded.has(stripQ(url))) return;
       const hit = { url, referer: referer || pageUrl, kind };
-      // HLS/DASH é o melhor sinal (é o episódio inteiro); mp4 espera um pouco por um m3u8
-      if (kind === 'hls' || kind === 'dash') return finish(hit);
-      if (!best) {
-        best = hit;
-        mp4Timer = setTimeout(() => finish(best), 2500);
-      }
+      // HLS/DASH é o melhor sinal (é o episódio inteiro, em partes)
+      if ((kind === 'hls' || kind === 'dash') && !LOOKS_PREVIEW.test(url)) return finish(hit);
+      const prev = cands.get(url);
+      cands.set(url, { ...hit, weight: Math.max(weight, prev?.weight || 0), order: prev?.order ?? cands.size });
+      if (!best) best = hit;
+      // Espera um pouco por outros vídeos (um m3u8, ou o mp4 grande do episódio) antes de escolher
+      if (!mp4Timer) mp4Timer = setTimeout(() => finish(pickBest()), 4000);
     };
 
-    const hardTimer = setTimeout(() => finish(best), timeoutMs);
+    const hardTimer = setTimeout(() => finish(pickBest()), timeoutMs);
     const cancelPoll = setInterval(() => {
       if (opts.signal?.cancelled) finish(null);
       if (done) clearInterval(cancelPoll);
@@ -165,7 +185,10 @@ function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<S
         const h = details.responseHeaders || {};
         const ct = (h['content-type'] || h['Content-Type'] || [])[0] || '';
         const kind = classify(details.url, ct);
-        if (kind && (ct || MEDIA_EXT.test(details.url))) found(details.url, details.referrer || '', kind);
+        // Tamanho do arquivo (Content-Length, ou o total do Content-Range): o episódio é o arquivo grande
+        const len = Number((h['content-length'] || h['Content-Length'] || [])[0] || 0);
+        const total = Number((((h['content-range'] || h['Content-Range'] || [])[0] || '').split('/')[1]) || 0);
+        if (kind && (ct || MEDIA_EXT.test(details.url))) found(details.url, details.referrer || '', kind, Math.max(len, total));
       }
       callback({});
     });
@@ -175,9 +198,13 @@ function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<S
       if (done || win.isDestroyed()) return;
       for (const frame of win.webContents.mainFrame.framesInSubtree) {
         try {
-          const src = await frame.executeJavaScript(PLAY_SCRIPT, true);
-          const kind = typeof src === 'string' ? classify(src) || 'mp4' : null;
-          if (kind && typeof src === 'string' && !NOT_THE_VIDEO.test(src)) found(src, frame.url || pageUrl, kind);
+          const list = await frame.executeJavaScript(PLAY_SCRIPT, true);
+          for (const v of Array.isArray(list) ? list : []) {
+            const src = String(v?.src || '');
+            if (!src || NOT_THE_VIDEO.test(src)) continue;
+            // Peso pela duração (um episódio de 20 min "pesa" mais que qualquer prévia)
+            found(src, frame.url || pageUrl, classify(src) || 'mp4', Number(v?.dur || 0) * 1e6 + Number(v?.area || 0));
+          }
         } catch {
           /* frame fechou ou bloqueou */
         }

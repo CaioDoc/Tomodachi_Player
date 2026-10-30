@@ -198,14 +198,22 @@ export function extractSiteItems(doc: Document, pageUrl: string, scorer: Scorer)
  * Busca no site. `scorer` diz quanto um nome bate com a obra procurada (0..1);
  * serve para escolher o nome certo de cada card e para saber quando parar de tentar.
  */
+// Site sem nenhuma busca que funcione (ou fora do ar): não tenta de novo por 30 min
+const DEAD_MS = 30 * 60 * 1000;
+const deadHosts = new Map<string, number>();
+const noFormHosts = new Set<string>();
+
 export async function searchSite(baseUrl: string, query: string, scorer: Scorer): Promise<SiteItem[]> {
   const base = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
   const host = hostOf(base);
   if (!host || !query.trim()) return [];
+  const deadAt = deadHosts.get(host);
+  if (deadAt && Date.now() - deadAt < DEAD_MS) throw new Error('O site não respondeu');
   const saved = readTemplates()[host];
   const tried = new Set<string>();
 
   let best: SiteItem[] = [];
+  let workingTpl: string | null = null;
   let bestTop = 0;
   let reachable = false;
   const tryTemplate = async (tpl: string) => {
@@ -224,6 +232,8 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
       if (saved !== tpl) saveTemplate(host, tpl);
       return true;
     }
+    // Página de resultados de verdade (com obras), só não tinha esta: este é o jeito de buscar do site
+    if (items.length >= 2 && !saved) workingTpl = workingTpl || tpl;
     return false;
   };
 
@@ -233,18 +243,31 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
     if (reachable) return best;
   }
   // Formulário de busca da página inicial (o jeito "oficial" do site): guarda mesmo sem achar a obra
-  const home = await getDoc(base);
+  const home = noFormHosts.has(host) ? null : await getDoc(base);
   if (home) {
     reachable = true;
     const tpl = findSearchTemplate(home.doc, home.url);
     if (tpl) {
-      const found = await tryTemplate(tpl);
+      // O site tem busca própria: o resultado dela é a resposta (não precisa tentar outros endereços)
+      await tryTemplate(tpl);
       saveTemplate(host, tpl);
-      if (found || best.length) return best;
+      return best;
     }
   }
-  for (const tpl of FALLBACK_TEMPLATES.slice(0, 5)) if (await tryTemplate(tpl)) return best;
-  if (!reachable) throw new Error('O site não respondeu');
+  for (const tpl of FALLBACK_TEMPLATES.slice(0, noFormHosts.has(host) ? 1 : 5)) {
+    if (await tryTemplate(tpl)) return best;
+    if (workingTpl) {
+      saveTemplate(host, workingTpl);
+      return best;
+    }
+  }
+  // Fora do ar: pula este site por um tempo. Sem formulário e sem resultado: nas próximas buscas
+  // tenta só o endereço mais comum (1 pedido em vez de 6)
+  if (!reachable) {
+    deadHosts.set(host, Date.now());
+    throw new Error('O site não respondeu');
+  }
+  noFormHosts.add(host);
   return best;
 }
 
@@ -253,7 +276,17 @@ export async function siteEpisodeLinks(pageUrl: string): Promise<Array<{ url: st
   const page = await getDoc(pageUrl);
   if (!page) return [];
   const host = hostOf(page.url);
+  // Barras laterais e listas de "recentes/relacionados" têm episódios de OUTRAS obras
+  page.doc
+    .querySelectorAll('header, nav, footer, aside, script, style, .sidebar, #sidebar, .widget, [class*="sidebar" i], [class*="related" i], [class*="recent" i], [class*="popular" i], [class*="recomend" i], [class*="recommend" i], [id*="related" i], [id*="recent" i]')
+    .forEach((n) => n.remove());
+  // "Nome" da obra no endereço (ex.: /anime/futabu/ → futabu): episódios dela costumam repetir isso
+  const slugWords = (new URL(page.url).pathname.split('/').filter(Boolean).pop() || '')
+    .toLowerCase()
+    .split(/[-_]+/)
+    .filter((w) => w.length >= 3 && !/^(anime|serie|series|assistir|watch|online|dublado|legendado|todos|episodios|episodes)$/.test(w));
   const byNumber = new Map<number, { url: string; name: string; number: number }>();
+  const all: Array<{ url: string; name: string; number: number }> = [];
   for (const a of Array.from(page.doc.querySelectorAll<HTMLAnchorElement>('a[href]'))) {
     let abs: URL;
     try {
@@ -269,8 +302,14 @@ export async function siteEpisodeLinks(pageUrl: string): Promise<Array<{ url: st
       abs.pathname.match(/(?:episodio|episode|ep)[-_/]?(\d+(?:\.\d+)?)(?:[-_/]|$)/i);
     if (!m) continue;
     const n = Number(m[1]);
-    if (!Number.isFinite(n) || n <= 0 || n > 5000 || byNumber.has(n)) continue;
-    byNumber.set(n, { url: abs.href.split('#')[0], name: text || `Episódio ${n}`, number: n });
+    if (!Number.isFinite(n) || n <= 0 || n > 5000) continue;
+    all.push({ url: abs.href.split('#')[0], name: text || `Episódio ${n}`, number: n });
   }
+  let list = all;
+  if (slugWords.length) {
+    const own = list.filter((e) => slugWords.every((w) => e.url.toLowerCase().includes(w)));
+    if (own.length) list = own;
+  }
+  for (const e of list) if (!byNumber.has(e.number)) byNumber.set(e.number, e);
   return Array.from(byNumber.values()).sort((x, y) => x.number - y.number);
 }

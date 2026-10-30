@@ -613,3 +613,14 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
   - MP4 com áudio AC3, E-AC3, DTS ou TrueHD (que o Chromium tocaria mudo) passa pelo FFmpeg só no áudio;
   - novos formatos aceitos: MK3D, DivX, ASF, F4V, MTS, MPG/MPEG/M2V, 3GP/3G2, OGV/OGM, RM, MXF, DV, WTV, além dos que já existiam;
   - links diretos de MKV, AVI, DASH (mpd) etc. são convertidos desde o início.
+
+## Escolha de sites à vista, episódios certos e busca mais rápida (1.6.9-beta)
+
+- **Escolher sites no "Onde assistir"** agora fica à vista: faixa "Buscando em X de Y sites · Escolher sites" com caixas de marcar, "Marcar todos" e "Desmarcar todos"; cada site tem um × para parar de buscar nele na hora. Com muitos sites e nenhuma escolha feita, a lista já abre sozinha. Tudo fica salvo.
+- **Episódios com número e nome certos:** sites de vídeo agora usam um leitor de episódios próprio (antes era o de mangá, que pegava obras relacionadas e números soltos como views/ano — daí os vários "39" com o nome inteiro da obra). Só entram links da própria obra com número de episódio claro; o nome fica curto ("Episódio 3 · Legendado").
+- **Busca nas extensões mais rápida:**
+  - no máximo 4 variações do nome por site (nomes alternativos antes das versões cortadas) e para cedo quando acha;
+  - 6 sites ao mesmo tempo (antes 3);
+  - o jeito de buscar que funcionou fica salvo mesmo sem achar a obra; site sem busca própria tenta só 1 endereço nas próximas vezes;
+  - site fora do ar é pulado por 10–30 min; site com proteção vai direto para o modo navegador; página de erro do navegador não conta como resultado.
+- **"Formato não suportado":** a página do episódio pode ter vários vídeos (prévias de outras obras, trailers, anúncios). Agora o app escolhe o episódio (o maior/mais longo) e descarta prévias; se mesmo assim o vídeo não abrir, o player avisa e "Procurar outro vídeo na página" tenta outro, sem repetir o que falhou.

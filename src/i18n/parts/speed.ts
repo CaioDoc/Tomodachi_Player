@@ -17,6 +17,16 @@ const parts: Parts = {
   'Todos os sites estão desligados. Ligue algum acima para buscar.': ['All sites are turned off. Turn one on above to search.', 'Todos los sitios están desactivados. Activa alguno arriba para buscar.'],
   'O site não respondeu': ["The site didn't respond", 'El sitio no respondió'],
   'O site demorou demais para responder': ['The site took too long to respond', 'El sitio tardó demasiado en responder'],
+  'O vídeo achado na página não abriu no player.': ["The video found on the page didn't open in the player.", 'El video encontrado en la página no se abrió en el reproductor.'],
+  'Procurar outro vídeo na página': ['Look for another video on the page', 'Buscar otro video en la página'],
+  'Não buscar neste site (fica salvo; dá para religar em "Escolher sites")': ['Don\'t search this site (saved; turn it back on in "Choose sites")', 'No buscar en este sitio (se guarda; puedes reactivarlo en "Elegir sitios")'],
+  'Não buscar em {site}': ["Don't search {site}", 'No buscar en {site}'],
+  'Buscando em {n} de {total} sites': ['Searching {n} of {total} sites', 'Buscando en {n} de {total} sitios'],
+  'Marque só os sites onde quer procurar. Menos sites = busca mais rápida. A escolha fica salva para os próximos episódios e obras.': [
+    'Check only the sites you want to search. Fewer sites = faster search. Your choice is saved for the next episodes and titles.',
+    'Marca solo los sitios donde quieres buscar. Menos sitios = búsqueda más rápida. La elección se guarda para los próximos episodios y obras.',
+  ],
+  'Marcar todos': ['Select all', 'Marcar todos'],
 };
 
 export default parts;

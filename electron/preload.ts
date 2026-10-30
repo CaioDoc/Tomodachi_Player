@@ -103,7 +103,7 @@ export interface ElectronAPI {
   extractChapterPages: (chapterUrl: string, mangaUrl?: string, sourceName?: string) => Promise<{ success: boolean; pages?: string[]; title?: string; error?: string }>;
   extractMangaChapters: (mangaUrl: string, sourceName?: string) => Promise<{ success: boolean; chapters?: { url: string; name: string; number: number }[]; error?: string }>;
   resolveCover: (url: string, sourceName?: string) => Promise<{ success: boolean; url?: string; error?: string }>;
-  extractVideoStream: (pageUrl: string, sourceName?: string) => Promise<{ success: boolean; type?: 'stream' | 'embed'; streamUrl?: string; embedUrl?: string; url?: string; referer?: string; servers?: Array<{ name: string; url: string }>; error?: string; kind?: string }>;
+  extractVideoStream: (pageUrl: string, sourceName?: string, opts?: { exclude?: string[]; fresh?: boolean }) => Promise<{ success: boolean; type?: 'stream' | 'embed'; streamUrl?: string; embedUrl?: string; url?: string; referer?: string; servers?: Array<{ name: string; url: string }>; error?: string; kind?: string }>;
   scrapeExtensionCatalog: (params: { baseUrl: string; query?: string; page?: number; sourceName?: string }) => Promise<{ success: boolean; items: Array<{ title: string; url: string; cover: string; author?: string; description?: string; genres?: string[] }>; error?: string }>;
   getAdblockStatus: () => Promise<{ enabled: boolean; blockedCount: number }>;
   toggleAdblock: (enable?: boolean) => Promise<{ enabled: boolean; blockedCount: number }>;
@@ -257,8 +257,8 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('manga:extractChapters', { mangaUrl, sourceName }),
   resolveCover: (url: string, sourceName?: string) =>
     ipcRenderer.invoke('image:resolve', { url, sourceName }),
-  extractVideoStream: (pageUrl: string, sourceName?: string) =>
-    ipcRenderer.invoke('video:extractStream', { pageUrl, sourceName }),
+  extractVideoStream: (pageUrl: string, sourceName?: string, opts?: { exclude?: string[]; fresh?: boolean }) =>
+    ipcRenderer.invoke('video:extractStream', { pageUrl, sourceName, exclude: opts?.exclude, fresh: opts?.fresh }),
   scrapeExtensionCatalog: (params: { baseUrl: string; query?: string; page?: number; sourceName?: string }) =>
     ipcRenderer.invoke('extension:scrapeCatalog', params),
   getAdblockStatus: () => ipcRenderer.invoke('adblock:getStatus'),

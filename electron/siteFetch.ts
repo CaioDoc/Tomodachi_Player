@@ -10,6 +10,18 @@ import axios from 'axios';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const CACHE_MS = 5 * 60 * 1000;
 const cache = new Map<string, { at: number; html: string; url: string }>();
+// Sites que só abrem como navegador (proteção): vão direto para ele, sem esperar o pedido simples falhar
+const browserHosts = new Set<string>();
+// Sites fora do ar: falham na hora por 10 min, em vez de esperar o tempo limite a cada busca
+const DOWN_MS = 10 * 60 * 1000;
+const downHosts = new Map<string, number>();
+const hostOf = (u: string) => {
+  try {
+    return new URL(u).host.toLowerCase();
+  } catch {
+    return '';
+  }
+};
 
 export interface FetchHtmlResult {
   success: boolean;
@@ -43,7 +55,7 @@ async function viaHttp(url: string, referer?: string): Promise<FetchHtmlResult> 
   return { success: true, html, url: finalUrl, via: 'http' };
 }
 
-function viaBrowser(url: string, timeoutMs = 20000): Promise<FetchHtmlResult> {
+function viaBrowser(url: string, timeoutMs = 15000): Promise<FetchHtmlResult> {
   return new Promise((resolve) => {
     let done = false;
     const win = new BrowserWindow({
@@ -80,6 +92,10 @@ function viaBrowser(url: string, timeoutMs = 20000): Promise<FetchHtmlResult> {
     // Lê a página assim que carregar e de novo a cada 1,5 s (conteúdo montado por JavaScript)
     const poll = setInterval(() => void grab(), 1500);
     win.webContents.on('did-finish-load', () => setTimeout(() => void grab(), 700));
+    // Site fora do ar / endereço inexistente: falha na hora (sem ler a página de erro do Chromium)
+    win.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
+      if (isMainFrame && code !== -3) finish({ success: false, error: `${desc || 'falha'} (${code})` });
+    });
     win.loadURL(url, { userAgent: UA }).catch(() => {
       /* redirecionamentos abortam a navegação inicial; o poll continua */
     });
@@ -90,14 +106,24 @@ export async function fetchHtml(url: string, opts: { referer?: string; noCache?:
   if (!/^https?:\/\//i.test(url)) return { success: false, error: 'URL inválida' };
   const hit = cache.get(url);
   if (!opts.noCache && hit && Date.now() - hit.at < CACHE_MS) return { success: true, html: hit.html, url: hit.url, via: 'http' };
-  let result: FetchHtmlResult;
-  try {
-    result = await viaHttp(url, opts.referer);
-  } catch (err: any) {
-    result = { success: false, error: String(err?.message || err) };
+  const host = hostOf(url);
+  const downAt = downHosts.get(host);
+  if (downAt && Date.now() - downAt < DOWN_MS) return { success: false, error: 'O site não respondeu' };
+  let result: FetchHtmlResult = { success: false, error: 'blocked' };
+  if (!browserHosts.has(host)) {
+    try {
+      result = await viaHttp(url, opts.referer);
+    } catch (err: any) {
+      result = { success: false, error: String(err?.message || err) };
+    }
   }
   // 404 de verdade não precisa do navegador; o resto (403, 503, bloqueio, timeout) tenta como navegador
-  if (!result.success && !/status code 404/.test(result.error || '')) result = await viaBrowser(url);
+  if (!result.success && !/status code 404/.test(result.error || '')) {
+    const httpError = result.error || '';
+    result = await viaBrowser(url);
+    if (result.success) browserHosts.add(host);
+    else if (/ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|timeout|EAI_AGAIN|certificate/i.test(httpError) || browserHosts.has(host)) downHosts.set(host, Date.now());
+  }
   if (result.success && result.html) {
     cache.set(url, { at: Date.now(), html: result.html, url: result.url || url });
     if (cache.size > 80) cache.delete(cache.keys().next().value as string);
