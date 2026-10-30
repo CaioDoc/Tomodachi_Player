@@ -43,7 +43,7 @@ try {
   /* ignore */
 }
 
-const VIDEO = /\.(mkv|mp4|m4v|webm|avi|mov|ts|m2ts|wmv|flv|mpg|mpeg)$/i;
+const VIDEO = /\.(mkv|mk3d|mp4|m4v|webm|avi|divx|mov|ts|m2ts|mts|wmv|asf|flv|f4v|mpg|mpeg|m2v|3gp|ogv|rmvb|vob)$/i;
 const MIME: Record<string, string> = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.mov': 'video/quicktime', '.ts': 'video/mp2t' };
 const MAX_ACTIVE = 3;
 const METADATA_TIMEOUT = 90_000;

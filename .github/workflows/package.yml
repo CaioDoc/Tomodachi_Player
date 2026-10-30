@@ -58,6 +58,12 @@ jobs:
           $media = "$env:RUNNER_TEMP\tp-media"
           New-Item -ItemType Directory -Force "$media\tp-videos" | Out-Null
           & $ff.FullName -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=30 -f lavfi -i sine=frequency=440 -t 20 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$media\tp-videos\sample.mp4"
+          # Outros formatos: MKV com H.264 (só reempacota), AVI com MPEG-4 (converte) e MP4 com áudio AC3 (Chromium tocaria mudo)
+          New-Item -ItemType Directory -Force "$media\tp-formats" | Out-Null
+          & $ff.FullName -hide_banner -loglevel error -i "$media\tp-videos\sample.mp4" -c copy "$media\tp-formats\fmt-mkv.mkv"
+          & $ff.FullName -hide_banner -loglevel error -i "$media\tp-videos\sample.mp4" -c:v mpeg4 -q:v 5 -c:a libmp3lame "$media\tp-formats\fmt-avi.avi"
+          & $ff.FullName -hide_banner -loglevel error -i "$media\tp-videos\sample.mp4" -c:v copy -c:a ac3 "$media\tp-formats\fmt-ac3.mp4"
+          Get-ChildItem "$media\tp-formats" | Select-Object Name, Length | Out-String | Tee-Object e2e-out\formats.txt
           "MEDIA_DIR=$media" >> $env:GITHUB_ENV
       - name: Testar o pacote de ponta a ponta
         run: |

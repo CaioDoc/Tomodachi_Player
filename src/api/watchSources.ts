@@ -3,6 +3,7 @@
 //  - Extensões: procura o título nas extensões de anime e lista os episódios do site;
 //  - Plugins (Nuvio): acha a obra no catálogo (Cinemeta) e roda os plugins/addons.
 
+import { searchSite, siteEpisodeLinks } from './siteSearch';
 import { getAnimeSources, type InstalledExtension } from './extensionRegistry';
 import { fetchChapterList } from './chapterList';
 import { fetchJson, nuvioCatalog, nuvioMeta, type NuvioMeta, type NuvioMetaPreview, type NuvioType } from './nuvio';
@@ -241,19 +242,30 @@ const baseUrlOf = (ext: InstalledExtension) => {
 /** Procura a obra numa extensão (tenta o título completo, versões limpas e os nomes alternativos) */
 export async function searchInExtension(ext: InstalledExtension, req: WatchRequest): Promise<ExtensionMatch[]> {
   const api = window.electronAPI;
-  if (!api?.scrapeExtensionCatalog) return [];
   const titles = [req.title, ...(req.altTitles || [])].filter(Boolean);
   const queries = searchQueries(req, 7);
   const seen = new Map<string, ExtensionMatch>();
+  const scoreOf = (title: string, isEpisode: boolean) => bestScore(titles, title) * (isEpisode ? 0.85 : 1);
   let lastError: unknown = null;
   let anyOk = false;
   for (const query of queries) {
     try {
-      const res = await api.scrapeExtensionCatalog({ baseUrl: baseUrlOf(ext), query, page: 1, sourceName: ext.sourceName || ext.name });
-      if (res?.success) anyOk = true;
-      for (const it of res?.success ? res.items || [] : []) {
-        if (!it?.url || !it.title || seen.has(it.url)) continue;
-        seen.set(it.url, { title: it.title, url: it.url, cover: it.cover, score: bestScore(titles, it.title) });
+      if (api?.siteFetchHtml) {
+        // Busca como uma pessoa no site: formulário de busca do site + leitura dos cards
+        const items = await searchSite(baseUrlOf(ext), query, (cand) => bestScore(titles, cand));
+        anyOk = true;
+        for (const it of items) {
+          const score = scoreOf(it.title, it.isEpisode);
+          const prev = seen.get(it.url);
+          if (!prev || score > prev.score) seen.set(it.url, { title: it.title, url: it.url, cover: it.cover, score });
+        }
+      } else if (api?.scrapeExtensionCatalog) {
+        const res = await api.scrapeExtensionCatalog({ baseUrl: baseUrlOf(ext), query, page: 1, sourceName: ext.sourceName || ext.name });
+        if (res?.success) anyOk = true;
+        for (const it of res?.success ? res.items || [] : []) {
+          if (!it?.url || !it.title || seen.has(it.url)) continue;
+          seen.set(it.url, { title: it.title, url: it.url, cover: it.cover, score: bestScore(titles, it.title) });
+        }
       }
     } catch (err) {
       lastError = err;
@@ -262,11 +274,13 @@ export async function searchInExtension(ext: InstalledExtension, req: WatchReque
     if ([...seen.values()].some((m) => m.score >= 0.75)) break;
   }
   if (!anyOk && lastError) throw lastError;
-  return [...seen.values()].filter((m) => m.score >= 0.2).sort((a, b) => b.score - a.score).slice(0, 6);
+  return [...seen.values()].filter((m) => m.score >= 0.3).sort((a, b) => b.score - a.score).slice(0, 6);
 }
 
 export async function extensionEpisodes(ext: InstalledExtension, url: string): Promise<ExtensionEpisode[]> {
-  const list = await fetchChapterList(url, ext.sourceName || ext.name, url);
+  let list = await fetchChapterList(url, ext.sourceName || ext.name, url).catch(() => []);
+  // Não achou episódios do jeito de sempre: procura os links "Episódio N" na página
+  if (!list.length && window.electronAPI?.siteFetchHtml) list = (await siteEpisodeLinks(url).catch(() => [])) as typeof list;
   return list
     .filter((c) => c?.url)
     .map((c, i) => ({ url: c.url, name: c.name || '', number: Number(c.number) || i + 1 }))

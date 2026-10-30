@@ -588,3 +588,28 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
   - a mesma obra achada em várias fontes vira um card só, com "+N" para escolher a fonte;
   - AniList e MyAnimeList completam capa, nota e nomes alternativos (buscar "Attack on Titan" acha "Shingeki no Kyojin");
   - sem fontes instaladas, a busca avisa e leva para adicionar fontes; gêneros/tags sozinhos (ex.: tag clicada numa obra) continuam navegando pelo catálogo.
+
+## Busca nas extensões que acha o que o site tem, escolha de sites e tudo mais rápido (1.6.8-beta)
+
+- **Busca nas extensões (sites):**
+  - o app descobre sozinho o formulário de busca de cada site e guarda (antes buscava sempre em `?s=`, que muitos sites não usam);
+  - lê a página de resultados de verdade: pega o nome da obra do link, da imagem, do título do card (`<h2>/<h3>`) ou do texto, e a capa mesmo com carregamento preguiçoso;
+  - aceita 1 ou 2 resultados (antes exigia pelo menos 3), ignora menu, rodapé e "populares";
+  - site com proteção (Cloudflare) é carregado como num navegador, com os cookies do navegador do app;
+  - se o leitor de episódios não achar nada, procura os links "Episódio N" na página da obra.
+- **Onde assistir:**
+  - botão "Escolher sites" para ligar/desligar cada extensão; a escolha fica salva para os próximos episódios e obras;
+  - a obra achada em cada site é lembrada: o próximo episódio vai direto para a lista de episódios, sem buscar de novo;
+  - lista de episódios de cada site fica guardada por 20 min.
+- **Mais rápido:**
+  - HLS (m3u8) toca direto no player com o hls.js: começa em ~1 s e dá para avançar/voltar sem conversão (o FFmpeg só entra se o hls.js não conseguir);
+  - mp4 dos sites toca direto (com os cabeçalhos que o servidor exige), sem passar pelo FFmpeg;
+  - a leitura rápida da página e a captura do vídeo rodam juntas; a captura não baixa imagens nem fontes e aperta play assim que a página monta;
+  - o vídeo achado fica guardado por 20 min e o próximo episódio já é preparado enquanto o atual toca;
+  - a tela de carregamento mostra o que está acontecendo, os segundos, e oferece "Procurar em outras fontes" se demorar;
+  - catálogos do AniList, Cinemeta e addons ficam guardados por 10 min (voltar para uma lista é instantâneo).
+- **Mais formatos:**
+  - MKV/AVI/TS/… com vídeo H.264, VP9 ou AV1 só têm a "caixa" trocada (sem reconverter a imagem): começa na hora e quase não usa o processador;
+  - MP4 com áudio AC3, E-AC3, DTS ou TrueHD (que o Chromium tocaria mudo) passa pelo FFmpeg só no áudio;
+  - novos formatos aceitos: MK3D, DivX, ASF, F4V, MTS, MPG/MPEG/M2V, 3GP/3G2, OGV/OGM, RM, MXF, DV, WTV, além dos que já existiam;
+  - links diretos de MKV, AVI, DASH (mpd) etc. são convertidos desde o início.

@@ -4,6 +4,7 @@ import ffmpegStatic from 'ffmpeg-static';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { probeMedia } from './mediaProbe';
 
 export function getFfmpegPath(): string {
   const isWin = process.platform === 'win32';
@@ -54,7 +55,31 @@ export function getFfmpegPath(): string {
 }
 
 // Containers que o Chromium NÃO decodifica nativamente (MKV, AVI, WMV, etc.)
-const NON_NATIVE_CONTAINERS = new Set(['.mkv', '.avi', '.wmv', '.flv', '.rmvb', '.vob', '.ts', '.m2ts', '.mov']);
+const NON_NATIVE_CONTAINERS = new Set([
+  '.mkv', '.mk3d', '.avi', '.divx', '.xvid', '.wmv', '.asf', '.flv', '.f4v', '.rm', '.rmvb', '.vob', '.ts', '.m2ts', '.mts', '.mov',
+  '.mpg', '.mpeg', '.m2v', '.3gp', '.3g2', '.ogv', '.ogm', '.mxf', '.dv', '.wtv',
+]);
+
+// Vídeo que o Chromium já decodifica: só troca a "caixa" (MKV → MP4) sem reconverter a imagem.
+// Começa na hora e quase não usa o processador; o resto (HEVC, 10-bit, MPEG-4…) é convertido.
+const probeCache = new Map<string, { mtime: number; info: Awaited<ReturnType<typeof probeMedia>> }>();
+async function canCopyVideo(input: string): Promise<boolean> {
+  try {
+    const mtime = (await fsp.stat(input)).mtimeMs;
+    let hit = probeCache.get(input);
+    if (!hit || hit.mtime !== mtime) {
+      hit = { mtime, info: await probeMedia(input) };
+      probeCache.set(input, hit);
+      if (probeCache.size > 200) probeCache.delete(probeCache.keys().next().value as string);
+    }
+    const v = hit.info?.video;
+    if (!v) return false;
+    const pix8 = !v.pixFmt || v.pixFmt === 'yuv420p' || v.pixFmt === 'yuvj420p';
+    return pix8 && (v.codec === 'h264' || v.codec === 'vp9' || v.codec === 'av1');
+  } catch {
+    return false;
+  }
+}
 
 function shouldTranscodeVideo(input: string, forceTranscode: boolean): boolean {
   if (forceTranscode) return true;
@@ -63,8 +88,8 @@ function shouldTranscodeVideo(input: string, forceTranscode: boolean): boolean {
 }
 
 // Constrói argumentos do FFmpeg com suporte a H.264 8-bit (yuv420p), transcode rápido e seeking
-function buildArgs(input: string, forceTranscode: boolean, startTime = 0, audioIndex = 0): string[] {
-  const transcode = shouldTranscodeVideo(input, forceTranscode);
+function buildArgs(input: string, forceTranscode: boolean, startTime = 0, audioIndex = 0, copyVideo = false): string[] {
+  const transcode = !copyVideo && shouldTranscodeVideo(input, forceTranscode);
   const args = ['-hide_banner', '-loglevel', 'error'];
 
   if (startTime > 0) {
@@ -167,7 +192,8 @@ export function registerMediaProtocol() {
 
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(currentFfmpegPath, buildArgs(filePath, transcode, startTime, audioIndex), {
+      const copyVideo = !transcode && shouldTranscodeVideo(filePath, false) && (await canCopyVideo(filePath));
+      child = spawn(currentFfmpegPath, buildArgs(filePath, transcode, startTime, audioIndex, copyVideo), {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch (err) {

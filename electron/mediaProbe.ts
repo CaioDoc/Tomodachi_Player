@@ -21,6 +21,8 @@ export interface MediaTrack {
 
 export interface MediaProbe {
   duration: number;
+  /** Primeira faixa de vídeo (codec e formato de pixel, ex.: h264 + yuv420p) */
+  video?: { codec: string; pixFmt?: string };
   audio: MediaTrack[];
   subtitles: MediaTrack[];
 }
@@ -45,7 +47,10 @@ export function parseFfmpegInfo(text: string): MediaProbe {
       const codec = m[4].toLowerCase();
       const rest = m[5] || '';
       const lang = m[2] && m[2] !== 'und' ? m[2] : undefined;
-      if (kind === 'Audio') {
+      if (kind === 'Video' && !out.video && !/attached pic/.test(rest)) {
+        const pix = rest.match(/,\s*([a-z0-9_]+)(?:\(|,|\s)/i);
+        out.video = { codec, pixFmt: pix ? pix[1].toLowerCase() : undefined };
+      } else if (kind === 'Audio') {
         current = { index: out.audio.length, lang, codec, isDefault: /\(default\)/.test(rest) };
         out.audio.push(current);
       } else if (kind === 'Subtitle') {

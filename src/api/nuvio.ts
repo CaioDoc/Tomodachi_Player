@@ -189,13 +189,36 @@ async function fetchText(url: string): Promise<string> {
   return r.text();
 }
 
-export async function fetchJson<T = any>(url: string): Promise<T> {
+// Catálogos e detalhes (Cinemeta e addons) mudam pouco: guarda 10 min e junta pedidos iguais
+const JSON_TTL = 10 * 60 * 1000;
+const jsonCache = new Map<string, { at: number; data: any }>();
+const jsonInflight = new Map<string, Promise<any>>();
+const cacheable = (url: string) => /\/(?:catalog|meta)\//.test(url);
+
+async function fetchJsonNow<T>(url: string): Promise<T> {
   const text = await fetchText(url);
   try {
     return JSON.parse(text);
   } catch {
     throw new Error(t('Resposta inválida (não é JSON)'));
   }
+}
+
+export async function fetchJson<T = any>(url: string): Promise<T> {
+  if (!cacheable(url)) return fetchJsonNow<T>(url);
+  const hit = jsonCache.get(url);
+  if (hit && Date.now() - hit.at < JSON_TTL) return hit.data as T;
+  const running = jsonInflight.get(url);
+  if (running) return running as Promise<T>;
+  const job = fetchJsonNow<T>(url)
+    .then((data) => {
+      jsonCache.set(url, { at: Date.now(), data });
+      if (jsonCache.size > 150) jsonCache.delete(jsonCache.keys().next().value as string);
+      return data;
+    })
+    .finally(() => jsonInflight.delete(url));
+  jsonInflight.set(url, job);
+  return job;
 }
 
 function parseManifest(raw: any, manifestUrl: string): Omit<NuvioRepo, 'addedAt' | 'updatedAt'> {

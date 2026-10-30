@@ -158,6 +158,10 @@ interface AniListBrowserProps {
   actionsTarget?: HTMLElement | null;
 }
 
+// Páginas do AniList já carregadas (10 min): voltar para uma lista é instantâneo
+const ANILIST_CACHE_MS = 10 * 60 * 1000;
+const ANILIST_PAGE_CACHE = new Map<string, { at: number; list: any[]; pageInfo: any }>();
+
 export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, externalQuery, actionsTarget, onResults }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const embedded = externalQuery !== undefined;
@@ -302,6 +306,24 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
     }
 
     setLoadError(null);
+    const variables = {
+      page,
+      perPage: 24,
+      search: text || undefined,
+      sort,
+      format,
+      genres: genres.length ? genres : undefined,
+      tags: parsedQuery.tags.length ? parsedQuery.tags : undefined,
+    };
+    const cacheKey = JSON.stringify(variables);
+    // Mesma lista vista há pouco (trocar de aba e voltar): aparece na hora, sem esperar o AniList
+    const cached = ANILIST_PAGE_CACHE.get(cacheKey);
+    if (cached && Date.now() - cached.at < ANILIST_CACHE_MS) {
+      setAnimes(cached.list);
+      setPageInfo(cached.pageInfo);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch('https://graphql.anilist.co', {
         method: 'POST',
@@ -309,18 +331,7 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({
-          query: GRAPHQL_QUERY,
-          variables: {
-            page,
-            perPage: 24,
-            search: text || undefined,
-            sort,
-            format,
-            genres: genres.length ? genres : undefined,
-            tags: parsedQuery.tags.length ? parsedQuery.tags : undefined,
-          },
-        }),
+        body: JSON.stringify({ query: GRAPHQL_QUERY, variables }),
       });
 
       if (res.ok) {
@@ -332,6 +343,8 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
           currentPage: page,
           lastPage: 1,
         };
+        ANILIST_PAGE_CACHE.set(cacheKey, { at: Date.now(), list, pageInfo: pInfo });
+        if (ANILIST_PAGE_CACHE.size > 60) ANILIST_PAGE_CACHE.delete(ANILIST_PAGE_CACHE.keys().next().value as string);
         setAnimes(list);
         setPageInfo(pInfo);
       } else {

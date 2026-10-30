@@ -76,6 +76,8 @@ Every executable is built automatically by GitHub Actions straight from this rep
 - Built-in browser with an ad blocker.
 - AniList sync.
 - **Incognito mode:** watch and read without saving history or progress (button next to Donate).
+- **Fast:** HLS plays straight in the player (hls.js), the next episode is prepared while you watch, and H.264 MKV files are just remuxed.
+- **Pick sites in "Where to watch":** turn extensions on/off; your choice and the title found are remembered for the next episodes.
 - **Everything plays inside the app:** the player finds the video on the episode page by itself; if a source fails, it offers others.
 - **Search your sources:** only what your extensions, add-ons and plugins have shows up, from the closest match to the loosest.
 - **MyAnimeList in search:** results get MyAnimeList scores and titles, no key needed (you can use the official API with your own Client ID in Settings → Accounts).

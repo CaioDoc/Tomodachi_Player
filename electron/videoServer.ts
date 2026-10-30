@@ -8,7 +8,7 @@ let server: http.Server | null = null;
 let port = 0;
 
 // containers que o Chromium NÃO abre sozinho
-export const NEEDS_TRANSCODE = new Set(['.mkv', '.avi', '.wmv', '.flv', '.mov', '.rmvb', '.vob', '.ts', '.m2ts']);
+export const NEEDS_TRANSCODE = new Set(['.mkv', '.mk3d', '.avi', '.divx', '.wmv', '.asf', '.flv', '.f4v', '.mov', '.rm', '.rmvb', '.vob', '.ts', '.m2ts', '.mts', '.mpg', '.mpeg', '.m2v', '.3gp', '.3g2', '.ogv', '.ogm', '.mxf', '.dv', '.wtv']);
 
 export async function startVideoServer(): Promise<number> {
   if (server) return port;

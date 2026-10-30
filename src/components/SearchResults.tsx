@@ -24,6 +24,7 @@ import {
   type StremioAddon,
 } from '../api/nuvio';
 import { MAL_EVENT } from '../api/myanimelist';
+import { searchSite } from '../api/siteSearch';
 import { buildEnrichIndex, type EnrichIndex } from '../api/searchEnrich';
 import { bestRelevance, MIN_RELEVANCE, relevance, titleKey } from '../utils/relevance';
 import { canonicalGenre, norm } from '../utils/smartSearch';
@@ -197,8 +198,18 @@ export const SearchResults: React.FC<{
       const sid = `site:${ext.pkg}`;
       const name = ext.name || ext.sourceName;
       try {
-        const res = await window.electronAPI?.scrapeExtensionCatalog?.({ baseUrl: baseUrlOf(ext), query: q, page: 1, sourceName: ext.sourceName || ext.name });
-        const items = res?.success ? res.items || [] : [];
+        let items: Array<{ url: string; title: string; cover?: string; description?: string; genres?: string[] }> = [];
+        let ok = true;
+        if (window.electronAPI?.siteFetchHtml) {
+          // Busca como uma pessoa no site (formulário de busca do site + leitura dos cards)
+          const found = await searchSite(baseUrlOf(ext), q, (cand) => relevance(cand, q) / 100);
+          items = found.filter((it) => !it.isEpisode || !found.some((o) => !o.isEpisode && titleKey(o.title) === titleKey(it.title)));
+        } else {
+          const res = await window.electronAPI?.scrapeExtensionCatalog?.({ baseUrl: baseUrlOf(ext), query: q, page: 1, sourceName: ext.sourceName || ext.name });
+          ok = res?.success !== false;
+          items = res?.success ? res.items || [] : [];
+        }
+        const res = { success: ok };
         const seen = new Set<string>();
         const hits: RawHit[] = [];
         for (const it of items) {

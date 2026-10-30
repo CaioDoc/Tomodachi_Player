@@ -32,6 +32,7 @@ import { recordResume } from '../utils/continueWatching';
 import { parseSubtitles, decodeSubtitleBytes, siblingSubtitleCandidates, type SubtitleCue } from '../utils/subtitles';
 import { Captions, CaptionsOff, SkipForward, AudioLines, ChevronRight, Radio, AlertTriangle, VenetianMask } from 'lucide-react';
 import { useIncognito } from '../utils/incognito';
+import Hls from 'hls.js';
 import { openWatchSources } from '../api/watchSources';
 import { t, tMaybe } from '../i18n';
 
@@ -322,6 +323,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // O site não entregou o vídeo: avisa no player (nunca abre a página do site)
   const [extractFailed, setExtractFailed] = useState<string | null>(null);
   const [extractTry, setExtractTry] = useState(0);
+  const [extractStartedAt, setExtractStartedAt] = useState(0);
+  const [, setTick] = useState(0);
+  // HLS (m3u8) toca direto no player com o hls.js: começa em ~1 s e permite avançar/voltar sem conversão
+  const [hlsSource, setHlsSource] = useState<{ url: string; referer?: string } | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [extractedMedia, setExtractedMedia] = useState<{
     type: 'embed' | 'stream';
     url: string;
@@ -399,6 +405,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (cancelled) return;
       if (info) {
         setProbe({ path: activeVideoPath, info });
+        // MP4 com áudio que o Chromium não toca (AC3, E-AC3, DTS, TrueHD…): o vídeo ficaria mudo.
+        // Passa pelo FFmpeg, que mantém a imagem e converte só o áudio.
+        const nativeBox = /\.(mp4|webm|m4v)$/i.test(activeVideoPath);
+        const firstAudio = info.audio[0];
+        if (nativeBox && firstAudio && /^(ac3|eac3|dts|dca|truehd|mlp|wmav|cook|pcm_s24|pcm_s32|pcm_f)/i.test(firstAudio.codec)) setPipeFor(activeVideoPath);
         // Idioma de áudio preferido (ex.: sempre japonês)
         const prefs = loadTrackPrefs();
         if (info.audio.length > 1) {
@@ -441,12 +452,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (directStream && activeVideoPath === actualPath) return false;
     if (activeVideoPath.startsWith('http://') || activeVideoPath.startsWith('https://')) {
       const lower = activeVideoPath.toLowerCase().split('?')[0];
-      const isDirectMedia =
-        lower.endsWith('.mp4') ||
-        lower.endsWith('.webm') ||
-        lower.endsWith('.mkv') ||
-        lower.endsWith('.m3u8') ||
-        lower.endsWith('.mpd');
+      const isDirectMedia = /\.(mp4|m4v|webm|mkv|mk3d|m3u8|mpd|avi|mov|flv|f4v|ts|m2ts|mts|wmv|asf|mpg|mpeg|3gp|ogv)$/.test(lower);
       return !isDirectMedia;
     }
     return false;
@@ -474,6 +480,33 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setExtractedMedia(null);
 
     setExtractFailed(null);
+    setHlsSource(null);
+
+    /** Cabeçalhos que o servidor do vídeo exige (Referer/Origin da página do player) */
+    const registerHeaders = async (url: string, referer?: string) => {
+      if (!referer || !window.electronAPI?.nuvioRegisterStream) return;
+      let origin = '';
+      try {
+        origin = new URL(referer).origin;
+      } catch {
+        /* ignore */
+      }
+      try {
+        await window.electronAPI.nuvioRegisterStream(url, origin ? { Referer: referer, Origin: origin } : { Referer: referer });
+      } catch {
+        /* segue sem */
+      }
+    };
+    /** Converte pelo FFmpeg (formatos que o Chromium não toca sozinho) */
+    const viaServer = async (url: string, referer?: string, alive?: () => boolean) => {
+      if (!window.electronAPI?.getStreamUrl) return;
+      try {
+        const u = await window.electronAPI.getStreamUrl({ filePath: url, referer });
+        if ((!alive || alive()) && typeof u === 'string' && u) setTranscodedUrl(u);
+      } catch (e) {
+        console.warn('Erro ao conectar ao servidor de streaming:', e);
+      }
+    };
 
     if (isWebUrl && !youtubeTrailerId) {
       if (!window.electronAPI?.extractVideoStream) {
@@ -482,6 +515,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
       let alive = true;
       setIsExtracting(true);
+      setExtractStartedAt(Date.now());
       window.electronAPI
         .extractVideoStream(activeVideoPath)
         .then(async (res) => {
@@ -491,16 +525,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setExtractFailed(tMaybe(res?.error) || t('O site não entregou o vídeo'));
             return;
           }
-          if (window.electronAPI?.getStreamUrl) {
-            try {
-              const transcoded = await window.electronAPI.getStreamUrl({ filePath: extractedUrl, referer: res.referer || activeVideoPath });
-              if (alive && transcoded) setTranscodedUrl(transcoded);
-            } catch (e) {
-              console.warn('Erro ao conectar ao servidor de streaming:', e);
-            }
-          }
+          const referer = res.referer || activeVideoPath;
+          await registerHeaders(extractedUrl, referer);
           if (!alive) return;
-          setExtractedMedia({ type: 'stream', url: extractedUrl, referer: res.referer || activeVideoPath, servers: res.servers });
+          const isHls = res.kind === 'hls' || /\.m3u8(?:[?#]|$)/i.test(extractedUrl);
+          const native = res.kind === 'mp4' || /\.(mp4|webm|m4v)(?:[?#]|$)/i.test(extractedUrl);
+          if (isHls && Hls.isSupported()) setHlsSource({ url: extractedUrl, referer });
+          else if (!native) await viaServer(extractedUrl, referer, () => alive);
+          // mp4/webm tocam direto (mais rápido e com busca); se o Chromium não aceitar, o erro do vídeo converte
+          if (!alive) return;
+          setExtractedMedia({ type: 'stream', url: extractedUrl, referer, servers: res.servers });
         })
         .catch((err) => {
           if (alive) setExtractFailed(tMaybe(String(err?.message || err)) || t('O site não entregou o vídeo'));
@@ -511,21 +545,74 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return () => {
         alive = false;
       };
-    } else if (directStream && /^https?:\/\//i.test(activeVideoPath) && /m3u8/i.test(activeVideoPath) && window.electronAPI?.getStreamUrl) {
-      // HLS não toca direto no Chromium: converte já de início (com busca pelo ?ss=)
+    } else if (directStream && /^https?:\/\//i.test(activeVideoPath) && /m3u8/i.test(activeVideoPath)) {
+      // HLS de plugins/addons: hls.js no próprio player; sem suporte, converte pelo FFmpeg
       let alive = true;
-      window.electronAPI
-        .getStreamUrl({ filePath: activeVideoPath, referer: streamReferer })
-        .then((u) => {
-          if (alive && typeof u === 'string' && u) setTranscodedUrl(u);
-        })
-        .catch(() => {});
+      if (Hls.isSupported()) {
+        void registerHeaders(activeVideoPath, streamReferer).then(() => alive && setHlsSource({ url: activeVideoPath, referer: streamReferer }));
+      } else void viaServer(activeVideoPath, streamReferer, () => alive);
+      return () => {
+        alive = false;
+      };
+    } else if (/^https?:\/\//i.test(activeVideoPath) && /\.(mkv|mk3d|avi|divx|wmv|asf|flv|f4v|ts|m2ts|mts|mpg|mpeg|3gp|mpd|rmvb|vob|ogm)(?:[?#]|$)/i.test(activeVideoPath)) {
+      // Link direto num formato que o Chromium não toca (MKV, AVI, DASH…): o FFmpeg do app converte desde o início
+      let alive = true;
+      void viaServer(activeVideoPath, streamReferer, () => alive);
       return () => {
         alive = false;
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVideoPath, isWebUrl, youtubeTrailerId, extractTry]);
+
+  // Liga o hls.js ao <video> (e desliga ao trocar de vídeo); erro grave → converte pelo FFmpeg
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!hlsSource || !v || isExtracting) return;
+    const hls = new Hls({ enableWorker: true, backBufferLength: 90, maxBufferLength: 60, startFragPrefetch: true, fragLoadingMaxRetry: 4, manifestLoadingMaxRetry: 3 });
+    hlsRef.current = hls;
+    let recovered = false;
+    hls.on(Hls.Events.ERROR, (_evt, data) => {
+      if (!data.fatal) return;
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
+        recovered = true;
+        hls.recoverMediaError();
+        return;
+      }
+      // Não deu com o hls.js (codec, bloqueio): o FFmpeg do app converte
+      hls.destroy();
+      hlsRef.current = null;
+      const src = hlsSource;
+      setHlsSource(null);
+      window.electronAPI
+        ?.getStreamUrl?.({ filePath: src.url, referer: src.referer })
+        .then((u) => typeof u === 'string' && u && setTranscodedUrl(u))
+        .catch(() => setError(t('Não foi possível reproduzir este vídeo.')));
+    });
+    hls.loadSource(hlsSource.url);
+    hls.attachMedia(v);
+    return () => {
+      hls.destroy();
+      if (hlsRef.current === hls) hlsRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hlsSource, isExtracting]);
+
+  // Enquanto este toca, já prepara o próximo episódio (abrir o próximo fica instantâneo)
+  const [playingSince, setPlayingSince] = useState(0);
+  useEffect(() => {
+    const next = nextEpisode?.url;
+    if (!playingSince || !next || !/^https?:\/\//i.test(next) || /anilist\.co|\.(m3u8|mp4|mkv|webm)(?:[?#]|$)/i.test(next)) return;
+    const id = setTimeout(() => void window.electronAPI?.extractVideoStream?.(next).catch(() => {}), 12000);
+    return () => clearTimeout(id);
+  }, [playingSince, nextEpisode?.url]);
+
+  // Relógio da tela "procurando o vídeo"
+  useEffect(() => {
+    if (!isExtracting) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [isExtracting]);
 
   // Legendas enviadas pela fonte (plugins): carrega a do idioma preferido
   useEffect(() => {
@@ -559,6 +646,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const baseSrc = React.useMemo(() => {
     if (transcodedUrl) return transcodedUrl;
+    if (hlsSource) return '';
     if (extractedMedia?.type === 'stream') return extractedMedia.url;
     if (!activeVideoPath) return '';
     if (isWebUrl) return '';
@@ -585,7 +673,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return window.electronAPI.mediaUrl(activeVideoPath, transcode);
     }
     return `media://stream/${encodeURIComponent(activeVideoPath)}${transcode ? '?tr=1' : ''}`;
-  }, [activeVideoPath, transcode, isWebUrl, transcodedUrl, extractedMedia, pipeFor]);
+  }, [activeVideoPath, transcode, isWebUrl, transcodedUrl, extractedMedia, pipeFor, hlsSource]);
 
   // Vídeos convertidos pelo FFmpeg (media://) não permitem busca nativa: cada salto
   // reinicia a conversão a partir do ponto escolhido (?ss=) com a faixa de áudio escolhida (?a=).
@@ -637,6 +725,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
 
   const handleError = async (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    // Com o hls.js, os erros são tratados por ele (e caem para o FFmpeg se preciso)
+    if (hlsRef.current) return;
     const v = e.currentTarget;
     const code = v.error?.code;
 
@@ -1056,7 +1146,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         const picked = await window.electronAPI.openFileDialog({
           title: t('Selecionar arquivo de vídeo para reproduzir'),
           filters: [
-            { name: t('Arquivos de Vídeo'), extensions: ['mp4', 'mkv', 'avi', 'webm', 'mov', 'flv', 'wmv', 'm4v'] },
+            { name: t('Arquivos de Vídeo'), extensions: ['mp4', 'm4v', 'mkv', 'mk3d', 'webm', 'avi', 'divx', 'mov', 'flv', 'f4v', 'wmv', 'asf', 'ts', 'm2ts', 'mts', 'mpg', 'mpeg', 'm2v', '3gp', '3g2', 'ogv', 'ogm', 'vob', 'rm', 'rmvb', 'mxf', 'dv', 'wtv'] },
             { name: t('Todos os arquivos'), extensions: ['*'] }
           ]
         });
@@ -1234,8 +1324,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         {isExtracting ? (
           <div className="flex-1 flex flex-col items-center justify-center bg-canvas p-8 gap-3 text-center">
             <Loader2 size={36} className="text-accent animate-spin" />
-            <h3 className="text-sm font-semibold text-fg">{t('Preparando reprodutor integrado...')}</h3>
-            <p className="text-xs text-fg-muted">{t('Sincronizando fluxo da obra e inicializando player na plataforma.')}</p>
+            {(() => {
+              const secs = extractStartedAt ? Math.max(0, Math.floor((Date.now() - extractStartedAt) / 1000)) : 0;
+              const phase =
+                secs < 3 ? t('Abrindo a página do episódio…') : secs < 9 ? t('Procurando o vídeo na página…') : t('Apertando play nos players do site para achar o vídeo…');
+              return (
+                <>
+                  <h3 className="text-sm font-semibold text-fg">{phase}</h3>
+                  <p className="text-xs text-fg-muted tabular-nums">{t('{n} s · o vídeo vai tocar aqui mesmo, no player do app', { n: secs })}</p>
+                  {secs >= 6 && !!currentEpisodeUrl && (
+                    <button
+                      type="button"
+                      onClick={openOtherSources}
+                      className="mt-1 h-8 px-3 rounded-md bg-subtle hover:bg-elevated border border-line text-[12px] text-fg inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Radio size={13} /> {t('Demorando? Procurar em outras fontes')}
+                    </button>
+                  )}
+                </>
+              );
+            })()}
           </div>
         ) : youtubeTrailerId ? (
           <div className="w-full h-full max-w-5xl flex flex-col gap-3 mx-auto p-4">
@@ -1304,7 +1412,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               autoPlay={isTabActive}
               preload="metadata"
               style={{ width: '100%', height: '100%', background: '#000' }}
-              onPlay={() => setIsPlaying(true)}
+              onPlay={() => {
+                setIsPlaying(true);
+                setPlayingSince((x) => x || Date.now());
+              }}
               onPlaying={() => setError(null)}
               onPause={() => setIsPlaying(false)}
               onTimeUpdate={handleTimeUpdate}

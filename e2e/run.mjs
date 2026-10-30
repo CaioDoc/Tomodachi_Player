@@ -3,6 +3,7 @@
 import { _electron as electron } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import http from 'node:http';
 
 const OUT = path.resolve('e2e-out');
 fs.mkdirSync(OUT, { recursive: true });
@@ -13,6 +14,52 @@ const consoleErrors = [];
 let shotN = 0;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+
+// ── Site de anime falso (local), parecido com os sites reais das extensões ──
+// Busca própria em /pesquisar?busca= (não é ?s=), nome no <h3> com imagem sem alt, menu e barra lateral,
+// página da obra com links "Episódio N" e episódio com o vídeo dentro de um iframe de player.
+const SITE_PORT = 47811;
+const SITE = `http://127.0.0.1:${SITE_PORT}`;
+const SAMPLE = MEDIA ? path.join(MEDIA, 'tp-videos', 'sample.mp4') : '';
+const page404 = '<html><body><main><p>Nada aqui</p></main></body></html>';
+http
+  .createServer((req, res) => {
+    const u = new URL(req.url || '/', SITE);
+    const html = (body) => {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!doctype html><html><head><title>Animes Teste</title></head><body>${body}</body></html>`);
+    };
+    const nav = '<header><nav><a href="/">Início</a><a href="/generos/acao">Ação</a><a href="/lancamentos">Lançamentos</a></nav><form class="search-form" action="/pesquisar" method="get"><input type="text" name="busca" placeholder="Pesquisar anime..."></form></header>';
+    if (u.pathname === '/') return html(nav + '<main><div class="item"><a href="/anime/outro"><img src="/x.jpg" alt="Outro Anime"></a></div></main>');
+    if (u.pathname === '/pesquisar') {
+      const q = (u.searchParams.get('busca') || '').toLowerCase();
+      const card = (slug, title) => `<div class="item"><a href="/anime/${slug}"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-src="/capa/${slug}.jpg" alt=""></a><h3 class="title"><a href="/anime/${slug}">${title}</a></h3></div>`;
+      const results = /tomodachi|teste/.test(q) ? card('tomodachi-teste', 'Tomodachi Teste Dublado') + card('tomodachi-teste-2', 'Tomodachi Teste 2nd Season') : '';
+      return html(nav + `<main class="results">${results || '<p>Nenhum resultado</p>'}</main><aside class="sidebar"><a href="/anime/naruto"><img src="/n.jpg" alt="Naruto Shippuden"></a></aside><footer><a href="/dmca">DMCA</a></footer>`);
+    }
+    if (u.pathname.startsWith('/anime/')) {
+      const slug = u.pathname.split('/')[2];
+      const eps = [1, 2, 3].map((n) => `<li><a href="/episodio/${slug}-episodio-${n}">Episódio ${n}</a></li>`).join('');
+      return html(nav + `<main><h1>Tomodachi Teste</h1><ul class="episodios">${eps}</ul></main>`);
+    }
+    if (u.pathname.startsWith('/episodio/')) return html(nav + `<main><h1>Episódio</h1><iframe src="/player/1" width="800" height="450"></iframe></main>`);
+    if (u.pathname.startsWith('/player/')) return html('<div class="player"><video controls preload="auto" src="/media/sample.mp4"></video></div>');
+    if (u.pathname === '/media/sample.mp4' && SAMPLE && fs.existsSync(SAMPLE)) {
+      const size = fs.statSync(SAMPLE).size;
+      const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+      if (range) {
+        const start = Number(range[1] || 0);
+        const end = range[2] ? Number(range[2]) : size - 1;
+        res.writeHead(206, { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 });
+        return fs.createReadStream(SAMPLE, { start, end }).pipe(res);
+      }
+      res.writeHead(200, { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Content-Length': size });
+      return fs.createReadStream(SAMPLE).pipe(res);
+    }
+    res.writeHead(404, { 'Content-Type': 'text/html' });
+    res.end(page404);
+  })
+  .listen(SITE_PORT, '127.0.0.1');
 
 async function launch(tag) {
   const t0 = Date.now();
@@ -398,6 +445,65 @@ await step('Assistir · nunca mostra o site: acha o vídeo ou avisa', async () =
   return info.slice(0, 300);
 });
 
+await step('Extensão (site) · acha a obra pela busca do site e toca o episódio no player do app', async () => {
+  await page.evaluate((base) => {
+    const list = JSON.parse(localStorage.getItem('installed_extensions') || '[]').filter((e) => e.pkg !== 'test.site');
+    list.push({ pkg: 'test.site', name: 'Site Teste', sourceName: 'Site Teste', baseUrl: base, type: 'anime', lang: 'pt' });
+    localStorage.setItem('installed_extensions', JSON.stringify(list));
+    window.dispatchEvent(new Event('extensions:updated'));
+  }, SITE);
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  await visible(page, '[aria-label="Catálogos"] [role=tab]:has-text("Animes")').first().click();
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('Tomodachi Teste');
+  await page.locator('section[aria-label="Resultados nas suas fontes"] >> text=Site Teste').first().waitFor({ timeout: 45000 });
+  await waitSearchDone();
+  await shot(page, 'site-teste-busca');
+  const titles = await resultTitles();
+  if (!/^Tomodachi Teste/.test(titles[0] || '')) throw new Error('o site não foi lido: ' + titles.join(' | '));
+  const tabsBefore = await page.locator('[draggable=true]').count();
+  await page.locator('section[aria-label="Resultados nas suas fontes"] div.group > button:first-child >> visible=true').first().click();
+  await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, tabsBefore, { timeout: 30000 });
+  await sleep(2500);
+  await visible(page, 'button:has-text("Assistir")').first().click();
+  const playEp = page.locator('[role=dialog] button:has-text("Assistir episódio 1") >> visible=true').first();
+  await playEp.waitFor({ timeout: 60000 });
+  await shot(page, 'site-teste-onde-assistir');
+  const t0 = Date.now();
+  await playEp.click();
+  // O vídeo do episódio (que está dentro de um iframe do player do site) toca no player do app
+  await page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.offsetParent && v.currentTime > 1), null, { timeout: 60000 });
+  const secs = ((Date.now() - t0) / 1000).toFixed(1);
+  const info = await page.evaluate(() => {
+    const v = [...document.querySelectorAll('video')].find((x) => x.offsetParent);
+    return v ? { src: v.currentSrc, t: v.currentTime } : null;
+  });
+  await shot(page, 'site-teste-tocando');
+  const webviews = await page.locator('webview').count();
+  const cached = await page.evaluate(() => localStorage.getItem('tp_watch_match_cache') || '');
+  await page.keyboard.press('Control+w').catch(() => {});
+  await sleep(600);
+  await page.keyboard.press('Control+w').catch(() => {});
+  await sleep(600);
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  await page.locator('input[placeholder*="ex."] >> visible=true').first().fill('');
+  if (webviews) throw new Error('abriu o site num navegador');
+  if (!/test\.site/.test(cached)) throw new Error('não guardou a obra achada no site (o próximo episódio buscaria de novo)');
+  return `tocou em ${secs}s pelo player do app (${String(info?.src).slice(0, 60)})`;
+});
+
+await step('Onde assistir · desligar um site fica salvo', async () => {
+  const off = await page.evaluate(() => {
+    localStorage.setItem('tp_watch_ext_off', JSON.stringify(['test.site']));
+    return localStorage.getItem('tp_watch_ext_off');
+  });
+  await page.evaluate(() => localStorage.removeItem('tp_watch_ext_off'));
+  if (off !== '["test.site"]') throw new Error('não salvou');
+  return 'salvo';
+});
+
 await step('Configurações · cartão do MyAnimeList', async () => {
   await goSection('Configurações');
   await sleep(1000);
@@ -513,6 +619,40 @@ await step('Modo anônimo · nada do que foi assistido ficou salvo', async () =>
   if (pos !== globalThis.__posBefore) throw new Error('a posição do vídeo foi salva no modo anônimo');
   if (cont !== globalThis.__contBefore) throw new Error('entrou no "Continuar assistindo" no modo anônimo');
   return `nada salvo (selo no player: ${badge ? 'sim' : 'não'}); modo desligado de novo`;
+});
+
+await step('Formatos · MKV, AVI e MP4 com áudio AC3 tocam no player', async () => {
+  if (!MEDIA) throw new Error('sem pasta de mídia');
+  await app.evaluate(({ dialog }, dir) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] });
+  }, path.join(MEDIA, 'tp-formats'));
+  await goSection('Animes & Vídeos');
+  await goTab('Local');
+  await visible(page, 'button:has-text("Adicionar Pastas")').click();
+  await visible(page, 'text=tp-formats').first().waitFor({ timeout: 30000 });
+  const out = [];
+  for (const name of ['fmt-mkv', 'fmt-avi', 'fmt-ac3']) {
+    await visible(page, 'text=tp-formats').first().click();
+    await visible(page, `text=${name}`).first().waitFor({ timeout: 30000 });
+    await visible(page, `text=${name}`).first().click();
+    const t0 = Date.now();
+    const ok = await page
+      .waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.offsetParent && v.currentTime > 1 && !v.error), null, { timeout: 45000 })
+      .then(() => true)
+      .catch(() => false);
+    await sleep(2500);
+    const src = await page.evaluate(() => [...document.querySelectorAll('video')].find((x) => x.offsetParent)?.currentSrc || '');
+    out.push(`${name}: ${ok ? 'tocou em ' + ((Date.now() - t0) / 1000).toFixed(1) + 's' : 'NÃO tocou'} (${src.split(':')[0]})`);
+    if (name === 'fmt-mkv') await shot(page, 'formato-mkv');
+    await page.keyboard.press('Control+w').catch(() => {});
+    await sleep(800);
+    await goSection('Animes & Vídeos');
+    await goTab('Local');
+  }
+  if (out.some((x) => /NÃO/.test(x))) throw new Error(out.join('; '));
+  // AC3 dentro de MP4 precisa passar pelo FFmpeg (senão o Chromium toca sem som)
+  if (!/fmt-ac3: tocou .*\(media\)/.test(out.join('; '))) throw new Error('MP4 com AC3 tocou sem converter o áudio: ' + out.join('; '));
+  return out.join('; ');
 });
 
 await step('Navegador integrado', async () => {

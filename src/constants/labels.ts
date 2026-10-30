@@ -1,7 +1,7 @@
 // src/constants/labels.ts
 import { t } from '../i18n';
 export const APP_NAME = 'Tomodachi Player';
-export const APP_VERSION = '1.6.7-beta';
+export const APP_VERSION = '1.6.8-beta';
 
 export const LABELS = {
   mangas: t('Mangás & Comics'),

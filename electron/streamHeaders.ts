@@ -5,6 +5,9 @@
 const BLOCKED = new Set(['host', 'content-length', 'range', 'connection', 'accept-encoding']);
 const TTL = 12 * 60 * 60 * 1000;
 const byHost = new Map<string, { headers: Record<string, string>; expires: number }>();
+// Último stream aberto: os pedaços dele (HLS) costumam vir de outro servidor (CDN) que exige o mesmo Referer
+let lastStream: { headers: Record<string, string>; expires: number } | null = null;
+const SEGMENT = /\.(?:ts|m4s|m3u8|key|aac|m4a|mp4|m4v|fmp4|vtt|webvtt|cmfv|cmfa)(?:[?#]|$)|\/(?:seg|segment|chunk|frag|hls|playlist)[^/]*(?:[/?#]|$)/i;
 
 const hostOf = (url: string) => {
   try {
@@ -25,14 +28,19 @@ export function registerStreamHeaders(url: string, headers: Record<string, strin
   }
   if (Object.keys(clean).length === 0) return;
   byHost.set(host, { headers: clean, expires: Date.now() + TTL });
+  lastStream = { headers: clean, expires: Date.now() + 6 * 60 * 60 * 1000 };
   if (byHost.size > 200) byHost.delete(byHost.keys().next().value as string);
 }
 
-export function streamHeadersFor(url: string): Record<string, string> | null {
+export function streamHeadersFor(url: string, resourceType?: string): Record<string, string> | null {
   const host = hostOf(url);
   if (!host) return null;
   const hit = byHost.get(host);
-  if (!hit) return null;
+  if (!hit) {
+    // Pedaço de vídeo pedido pelo player (hls.js/<video>) num servidor ainda desconhecido
+    if (lastStream && lastStream.expires > Date.now() && (resourceType === 'xhr' || resourceType === 'media') && SEGMENT.test(url)) return lastStream.headers;
+    return null;
+  }
   if (hit.expires < Date.now()) {
     byHost.delete(host);
     return null;

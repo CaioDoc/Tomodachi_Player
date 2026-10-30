@@ -5,7 +5,7 @@
 // O usuário não precisa saber de onde vem cada link.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Puzzle, Loader2, ChevronLeft, ChevronRight, ChevronDown, Play, RefreshCw, Plus, Globe, Zap, Pencil, Search } from 'lucide-react';
+import { Puzzle, Loader2, ChevronLeft, ChevronRight, ChevronDown, Play, RefreshCw, Plus, Globe, Zap, Pencil, Search, Check, SlidersHorizontal } from 'lucide-react';
 import {
   animeExtensionsFor,
   searchInExtension,
@@ -47,13 +47,81 @@ interface ExtState {
   error?: string;
 }
 
+/* Sites desligados no "Onde assistir" (vale para todos os episódios e obras até ligar de novo) */
+const OFF_KEY = 'tp_watch_ext_off';
+const EXT_TOGGLE_EVENT = 'tomodachi:watch-ext-toggle';
+function readOff(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(OFF_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+function setExtOn(pkg: string, on: boolean) {
+  const off = readOff();
+  if (on) off.delete(pkg);
+  else off.add(pkg);
+  try {
+    localStorage.setItem(OFF_KEY, JSON.stringify([...off]));
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent(EXT_TOGGLE_EVENT));
+}
+
+/* Obra já achada em cada site: o próximo episódio não precisa buscar de novo */
+const MATCH_KEY = 'tp_watch_match_cache';
+const workKeyOf = (req: WatchRequest) => req.workUrl || req.title.trim().toLowerCase();
+function readMatches(): Record<string, { title: string; url: string; cover?: string; at: number }> {
+  try {
+    return JSON.parse(localStorage.getItem(MATCH_KEY) || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+function rememberMatch(req: WatchRequest, pkg: string, m: ExtensionMatch | null) {
+  const all = readMatches();
+  const k = `${workKeyOf(req)}|${pkg}`;
+  if (m) all[k] = { title: m.title, url: m.url, cover: m.cover, at: Date.now() };
+  else delete all[k];
+  // Guarda só os 400 mais recentes
+  const entries = Object.entries(all).sort((a, b) => b[1].at - a[1].at).slice(0, 400);
+  try {
+    localStorage.setItem(MATCH_KEY, JSON.stringify(Object.fromEntries(entries)));
+  } catch {
+    /* ignore */
+  }
+}
+function forgetWork(req: WatchRequest) {
+  const all = readMatches();
+  const prefix = `${workKeyOf(req)}|`;
+  for (const k of Object.keys(all)) if (k.startsWith(prefix)) delete all[k];
+  try {
+    localStorage.setItem(MATCH_KEY, JSON.stringify(all));
+  } catch {
+    /* ignore */
+  }
+}
+
+/* Lista de episódios de cada página (vale por 20 min): trocar de episódio fica instantâneo */
+const EPS_TTL = 20 * 60 * 1000;
+const epsCache = new Map<string, { at: number; list: ExtensionEpisode[] }>();
+async function cachedEpisodes(ext: InstalledExtension, url: string): Promise<ExtensionEpisode[]> {
+  const hit = epsCache.get(url);
+  if (hit && Date.now() - hit.at < EPS_TTL) return hit.list;
+  const list = await extensionEpisodes(ext, url);
+  if (list.length) epsCache.set(url, { at: Date.now(), list });
+  return list;
+}
+
 const ExtensionCard: React.FC<{
   ext: InstalledExtension;
   state: ExtState;
   req: WatchRequest;
   episode: number;
   onPlay: (ext: InstalledExtension, ep: ExtensionEpisode | null, match: ExtensionMatch) => void;
-}> = ({ ext, state, req, episode, onPlay }) => {
+  onPicked?: (match: ExtensionMatch | null) => void;
+}> = ({ ext, state, req, episode, onPlay, onPicked }) => {
   const [picked, setPicked] = useState<ExtensionMatch | null>(null);
   const [eps, setEps] = useState<ExtensionEpisode[] | null>(null);
   const [loadingEps, setLoadingEps] = useState(false);
@@ -61,11 +129,12 @@ const ExtensionCard: React.FC<{
 
   const pick = async (m: ExtensionMatch) => {
     setPicked(m);
+    onPicked?.(m);
     setEps(null);
     setEpsError(null);
     setLoadingEps(true);
     try {
-      setEps(await extensionEpisodes(ext, m.url));
+      setEps(await cachedEpisodes(ext, m.url));
     } catch (err: any) {
       setEpsError(String(err?.message || err));
       setEps([]);
@@ -125,7 +194,16 @@ const ExtensionCard: React.FC<{
         <div className="px-3 pb-3 space-y-2">
           <div className="flex items-center gap-1.5 text-[11.5px] text-fg-muted">
             {state.matches.length > 1 && (
-              <button type="button" onClick={() => setPicked(null)} className="hover:text-fg cursor-pointer" aria-label={t('Voltar')} title={t('Escolher outro resultado')}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPicked(null);
+                  onPicked?.(null);
+                }}
+                className="hover:text-fg cursor-pointer"
+                aria-label={t('Voltar')}
+                title={t('Escolher outro resultado')}
+              >
                 <ChevronLeft size={14} />
               </button>
             )}
@@ -184,43 +262,77 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
   onPlayed,
   episodeUrl,
 }) => {
-  const exts = useMemo(() => animeExtensionsFor(req), [req]);
+  const allExts = useMemo(() => animeExtensionsFor(req), [req]);
+  const [off, setOff] = useState<Set<string>>(readOff);
+  useEffect(() => {
+    const on = () => setOff(readOff());
+    window.addEventListener(EXT_TOGGLE_EVENT, on);
+    return () => window.removeEventListener(EXT_TOGGLE_EVENT, on);
+  }, []);
+  const exts = useMemo(() => allExts.filter((e) => !off.has(e.pkg)), [allExts, off]);
   const [states, setStates] = useState<Record<string, ExtState>>({});
   const [showEmpty, setShowEmpty] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const reqRef = useRef(req);
   reqRef.current = req;
+  const searched = useRef<Set<string>>(new Set());
 
-  const searchAll = useCallback(async () => {
-    const initial: Record<string, ExtState> = {};
-    for (const e of exts) initial[e.pkg] = { status: 'searching', matches: [] };
-    // Obra que já veio de uma extensão: usa o link dela sem buscar
-    if (req.preferred?.url) {
-      const pref = exts[0];
-      if (pref) initial[pref.pkg] = { status: 'done', matches: [{ title: req.title, url: req.preferred.url, score: 1 }] };
-    }
-    setStates(initial);
-    const queue = exts.filter((e) => initial[e.pkg].status === 'searching');
-    const worker = async () => {
-      while (queue.length) {
-        const ext = queue.shift()!;
-        try {
-          const matches = await searchInExtension(ext, req);
-          if (reqRef.current !== req) return;
-          setStates((s) => ({ ...s, [ext.pkg]: { status: 'done', matches } }));
-        } catch (err: any) {
-          if (reqRef.current !== req) return;
-          setStates((s) => ({ ...s, [ext.pkg]: { status: 'error', matches: [], error: String(err?.message || err) } }));
-        }
+  /** Busca nos sites ligados que ainda não foram buscados (ou em todos, ao pedir de novo) */
+  const searchSome = useCallback(
+    async (list: InstalledExtension[], fresh: boolean) => {
+      const initial: Record<string, ExtState> = {};
+      const cached = fresh ? {} : readMatches();
+      const wk = workKeyOf(req);
+      for (const e of list) {
+        const c = cached[`${wk}|${e.pkg}`];
+        // Obra já achada neste site (em outro episódio): vai direto para os episódios
+        initial[e.pkg] = c ? { status: 'done', matches: [{ title: c.title, url: c.url, cover: c.cover, score: 1 }] } : { status: 'searching', matches: [] };
       }
-    };
-    await Promise.all([worker(), worker(), worker()]);
-  }, [exts, req]);
+      // Obra que já veio de uma extensão: usa o link dela sem buscar
+      if (req.preferred?.url && allExts[0] && list.some((e) => e.pkg === allExts[0].pkg)) {
+        initial[allExts[0].pkg] = { status: 'done', matches: [{ title: req.title, url: req.preferred.url, score: 1 }] };
+      }
+      for (const e of list) searched.current.add(e.pkg);
+      setStates((s) => ({ ...s, ...initial }));
+      const queue = list.filter((e) => initial[e.pkg].status === 'searching');
+      const worker = async () => {
+        while (queue.length) {
+          const ext = queue.shift()!;
+          try {
+            const matches = await searchInExtension(ext, req);
+            if (reqRef.current !== req) return;
+            setStates((s) => ({ ...s, [ext.pkg]: { status: 'done', matches } }));
+          } catch (err: any) {
+            if (reqRef.current !== req) return;
+            setStates((s) => ({ ...s, [ext.pkg]: { status: 'error', matches: [], error: String(err?.message || err) } }));
+          }
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+    },
+    [req, allExts]
+  );
 
+  // Pedido novo: busca nos sites ligados
   useEffect(() => {
-    void searchAll();
-  }, [searchAll]);
+    searched.current = new Set();
+    setStates({});
+    void searchSome(exts, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [req]);
+  // Site religado: busca só nele
+  useEffect(() => {
+    const pending = exts.filter((e) => !searched.current.has(e.pkg));
+    if (pending.length) void searchSome(pending, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exts]);
 
-  if (exts.length === 0) return null;
+  const searchAll = useCallback(() => {
+    forgetWork(req);
+    return searchSome(exts, true);
+  }, [exts, req, searchSome]);
+
+  if (allExts.length === 0) return null;
 
   const play = (ext: InstalledExtension, ep: ExtensionEpisode | null, match: ExtensionMatch) => {
     const url = ep?.url || match.url;
@@ -247,17 +359,66 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
         title={t('Sites')}
         hint={t('extensões')}
         right={
-          <button type="button" onClick={() => void searchAll()} className="p-1 rounded text-fg-muted hover:text-fg hover:bg-subtle cursor-pointer" title={t('Buscar de novo')} aria-label={t('Buscar de novo')}>
-            <RefreshCw size={12} />
-          </button>
+          <span className="inline-flex items-center gap-1">
+            {allExts.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setChoosing((v) => !v)}
+                className={`h-6 px-2 rounded text-[11px] inline-flex items-center gap-1 cursor-pointer ${choosing ? 'bg-accent/15 text-fg' : 'text-fg-muted hover:text-fg hover:bg-subtle'}`}
+                title={t('Escolher em quais sites buscar')}
+                aria-expanded={choosing}
+              >
+                <SlidersHorizontal size={12} /> {off.size ? t('{n} de {total} sites', { n: allExts.length - off.size, total: allExts.length }) : t('Escolher sites')}
+              </button>
+            )}
+            <button type="button" onClick={() => void searchAll()} className="p-1 rounded text-fg-muted hover:text-fg hover:bg-subtle cursor-pointer" title={t('Buscar de novo')} aria-label={t('Buscar de novo')}>
+              <RefreshCw size={12} />
+            </button>
+          </span>
         }
       />
+      {(choosing || off.size > 0) && (
+        <div className="px-4 pb-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] text-fg-muted">{t('Buscar nestes sites (fica salvo para os próximos episódios):')}</span>
+            {choosing && (
+              <button type="button" onClick={() => setChoosing(false)} className="text-[11px] text-accent hover:underline cursor-pointer">
+                {t('Pronto')}
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {allExts.map((e) => {
+              const on = !off.has(e.pkg);
+              return (
+                <button
+                  key={e.pkg}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  onClick={() => setExtOn(e.pkg, !on)}
+                  title={on ? t('Clique para não buscar neste site') : t('Clique para buscar neste site')}
+                  className={`h-7 pl-1.5 pr-2.5 rounded-full text-[11.5px] inline-flex items-center gap-1.5 cursor-pointer border transition-colors ${
+                    on ? 'bg-accent/15 border-accent/45 text-fg' : 'bg-subtle border-line-subtle text-fg-muted line-through'
+                  }`}
+                >
+                  <span className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center ${on ? 'bg-accent border-accent text-accent-fg' : 'border-line'}`}>
+                    {on && <Check size={10} strokeWidth={3} />}
+                  </span>
+                  {e.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {exts.length === 0 && <p className="px-4 pb-2 text-[12px] text-fg-muted">{t('Todos os sites estão desligados. Ligue algum acima para buscar.')}</p>}
       {list
         .filter((x) => x.state.status !== 'idle')
         .map(({ ext, state }) => (
-          <ExtensionCard key={ext.pkg} ext={ext} req={req} episode={episode} state={state} onPlay={play} />
+          <ExtensionCard key={ext.pkg} ext={ext} req={req} episode={episode} state={state} onPlay={play} onPicked={(m) => rememberMatch(req, ext.pkg, m)} />
         ))}
-      {searching === 0 && found === 0 && <p className="px-4 pb-2 text-[12px] text-fg-muted">{t('Nenhum site encontrou “{title}”.', { title: req.title })}</p>}
+      {exts.length > 0 && searching === 0 && found === 0 && <p className="px-4 pb-2 text-[12px] text-fg-muted">{t('Nenhum site encontrou “{title}”.', { title: req.title })}</p>}
       {empty.length > 0 && found > 0 && (
         <div className="px-4 pb-2">
           <button type="button" onClick={() => setShowEmpty((v) => !v)} className="text-[11px] text-fg-muted hover:text-fg inline-flex items-center gap-1 cursor-pointer">

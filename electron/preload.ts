@@ -103,7 +103,7 @@ export interface ElectronAPI {
   extractChapterPages: (chapterUrl: string, mangaUrl?: string, sourceName?: string) => Promise<{ success: boolean; pages?: string[]; title?: string; error?: string }>;
   extractMangaChapters: (mangaUrl: string, sourceName?: string) => Promise<{ success: boolean; chapters?: { url: string; name: string; number: number }[]; error?: string }>;
   resolveCover: (url: string, sourceName?: string) => Promise<{ success: boolean; url?: string; error?: string }>;
-  extractVideoStream: (pageUrl: string, sourceName?: string) => Promise<{ success: boolean; type?: 'stream' | 'embed'; streamUrl?: string; embedUrl?: string; url?: string; referer?: string; servers?: Array<{ name: string; url: string }>; error?: string }>;
+  extractVideoStream: (pageUrl: string, sourceName?: string) => Promise<{ success: boolean; type?: 'stream' | 'embed'; streamUrl?: string; embedUrl?: string; url?: string; referer?: string; servers?: Array<{ name: string; url: string }>; error?: string; kind?: string }>;
   scrapeExtensionCatalog: (params: { baseUrl: string; query?: string; page?: number; sourceName?: string }) => Promise<{ success: boolean; items: Array<{ title: string; url: string; cover: string; author?: string; description?: string; genres?: string[] }>; error?: string }>;
   getAdblockStatus: () => Promise<{ enabled: boolean; blockedCount: number }>;
   toggleAdblock: (enable?: boolean) => Promise<{ enabled: boolean; blockedCount: number }>;
@@ -171,6 +171,8 @@ export interface ElectronAPI {
   }>;
   malTest: (clientId: string) => Promise<{ success: boolean; count?: number; error?: string }>;
   malClearCache: () => Promise<{ success: boolean }>;
+  /** HTML de uma página de site (pedido simples ou, se bloqueado, como navegador) */
+  siteFetchHtml: (args: { url: string; referer?: string; noCache?: boolean }) => Promise<{ success: boolean; html?: string; url?: string; via?: 'http' | 'browser'; error?: string }>;
   anilistLogin: () => Promise<{ success: boolean; token?: string; expiresAt?: number; error?: string }>;
   anilistLogout: () => Promise<{ success: boolean }>;
   adblockGetSettings: () => Promise<AdblockSettingsInfo>;
@@ -328,6 +330,7 @@ const electronAPI: ElectronAPI = {
   malSearch: (args) => ipcRenderer.invoke('mal:search', args),
   malTest: (clientId: string) => ipcRenderer.invoke('mal:test', clientId),
   malClearCache: () => ipcRenderer.invoke('mal:clear-cache'),
+  siteFetchHtml: (args) => ipcRenderer.invoke('site:fetchHtml', args),
   anilistLogin: () => ipcRenderer.invoke('anilist:login'),
   anilistLogout: () => ipcRenderer.invoke('anilist:logout'),
   adblockGetSettings: () => ipcRenderer.invoke('adblock:getSettings'),

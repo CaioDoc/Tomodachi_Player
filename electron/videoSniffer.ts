@@ -46,19 +46,51 @@ const PLAY_SCRIPT = `(() => {
   } catch { return null; }
 })()`;
 
-// Uma busca por vez, numa sessão só dela (em memória, separada do navegador do app)
-let queue: Promise<unknown> = Promise.resolve();
+// Até 2 buscas ao mesmo tempo (ex.: o episódio atual e o próximo, pré-carregado), cada uma numa
+// sessão só dela, em memória e separada do navegador do app.
+const SLOTS = ['tp-video-sniffer-0', 'tp-video-sniffer-1'];
+const busy = new Set<string>();
+const waiting: Array<() => void> = [];
 
-export function sniffMedia(pageUrl: string, opts: { timeoutMs?: number; referer?: string } = {}): Promise<SniffResult | null> {
-  const run = queue.then(() => sniffOnce(pageUrl, opts));
-  queue = run.catch(() => null);
-  return run;
+async function takeSlot(): Promise<string> {
+  for (;;) {
+    const free = SLOTS.find((x) => !busy.has(x));
+    if (free) {
+      busy.add(free);
+      return free;
+    }
+    await new Promise<void>((r) => waiting.push(r));
+  }
+}
+function releaseSlot(slot: string) {
+  busy.delete(slot);
+  waiting.shift()?.();
 }
 
-function sniffOnce(pageUrl: string, opts: { timeoutMs?: number; referer?: string }): Promise<SniffResult | null> {
-  const timeoutMs = opts.timeoutMs ?? 25000;
+export interface SniffOptions {
+  timeoutMs?: number;
+  referer?: string;
+  /** Cancela a busca (ex.: outra forma já achou o vídeo) */
+  signal?: { cancelled: boolean };
+}
+
+export async function sniffMedia(pageUrl: string, opts: SniffOptions = {}): Promise<SniffResult | null> {
+  const slot = await takeSlot();
+  try {
+    if (opts.signal?.cancelled) return null;
+    return await sniffOnce(pageUrl, slot, opts);
+  } finally {
+    releaseSlot(slot);
+  }
+}
+
+// Imagens e fontes não ajudam a achar o vídeo: não baixa (página carrega bem mais rápido)
+const SKIP_TYPES = new Set(['image', 'font', 'imageset', 'cspReport', 'ping']);
+
+function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<SniffResult | null> {
+  const timeoutMs = opts.timeoutMs ?? 22000;
   return new Promise((resolve) => {
-    const ses: Session = session.fromPartition('tp-video-sniffer');
+    const ses: Session = session.fromPartition(slot);
     let done = false;
     let best: SniffResult | null = null;
     let mp4Timer: NodeJS.Timeout | null = null;
@@ -113,6 +145,10 @@ function sniffOnce(pageUrl: string, opts: { timeoutMs?: number; referer?: string
     };
 
     const hardTimer = setTimeout(() => finish(best), timeoutMs);
+    const cancelPoll = setInterval(() => {
+      if (opts.signal?.cancelled) finish(null);
+      if (done) clearInterval(cancelPoll);
+    }, 250);
 
     ses.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (details, callback) => {
       const kind = classify(details.url);
@@ -120,6 +156,7 @@ function sniffOnce(pageUrl: string, opts: { timeoutMs?: number; referer?: string
         found(details.url, details.referrer || '', kind);
         return callback({});
       }
+      if (SKIP_TYPES.has(details.resourceType)) return callback({ cancel: true });
       if (!handleAdblockBeforeRequest(details, callback)) callback({});
     });
     // Vídeos sem extensão no endereço: reconhece pelo tipo da resposta
@@ -146,14 +183,16 @@ function sniffOnce(pageUrl: string, opts: { timeoutMs?: number; referer?: string
         }
       }
     };
-    win.webContents.on('did-finish-load', () => {
+    // Começa a apertar play assim que a página monta (sem esperar anúncios e imagens) e repete
+    const startPoking = () => {
       void poke();
-      if (!pokeTimer) pokeTimer = setInterval(() => void poke(), 1500);
-    });
-    // Página que não terminou de carregar (anúncios pesados): começa a apertar play mesmo assim
+      if (!pokeTimer) pokeTimer = setInterval(() => void poke(), 1200);
+    };
+    win.webContents.on('dom-ready', startPoking);
+    win.webContents.on('did-finish-load', () => void poke());
     setTimeout(() => {
-      if (!done && !pokeTimer) pokeTimer = setInterval(() => void poke(), 1500);
-    }, 6000);
+      if (!done && !pokeTimer) startPoking();
+    }, 4000);
 
     win
       .loadURL(pageUrl, { userAgent: UA, httpReferrer: opts.referer || undefined })

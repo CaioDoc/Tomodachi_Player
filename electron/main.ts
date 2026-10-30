@@ -21,6 +21,7 @@ import { streamHeadersFor } from './streamHeaders';
 import { registerSecretsIpc } from './secrets';
 import { registerMalIpc } from './mal';
 import { sniffMedia } from './videoSniffer';
+import { registerSiteFetchIpc } from './siteFetch';
 import { registerAniListAuthIpc } from './anilistAuth';
 import {
   setupAdblocker,
@@ -205,7 +206,7 @@ function pickCover(images: string[]): string | null {
   return byName ?? sorted[0];
 }
 
-const VIDEO_EXT = new Set(['.mp4','.mkv','.avi','.mov','.webm','.m4v','.wmv','.flv','.ts','.m2ts','.mpg','.mpeg','.3gp','.ogv','.rmvb','.vob']);
+const VIDEO_EXT = new Set(['.mp4','.m4v','.mkv','.mk3d','.avi','.divx','.mov','.webm','.wmv','.asf','.flv','.f4v','.ts','.m2ts','.mts','.mpg','.mpeg','.m2v','.3gp','.3g2','.ogv','.ogm','.rm','.rmvb','.vob','.mxf','.dv','.wtv']);
 
 async function walkVideos(dir: string, out: any[], depth = 0, maxDepth = 10, rootPath = dir) {
   if (depth > maxDepth) return;
@@ -1046,7 +1047,7 @@ function unpackPackedJs(html: string): string | null {
 }
 
 // Extrator de stream de vídeo direto ou player embed para reprodução na plataforma sem erros de codec
-async function extractVideoStream(pageUrl: string): Promise<{
+async function extractVideoStreamNow(pageUrl: string): Promise<{
   success: boolean;
   type?: 'stream' | 'embed';
   streamUrl?: string;
@@ -1055,10 +1056,19 @@ async function extractVideoStream(pageUrl: string): Promise<{
   referer?: string;
   servers?: Array<{ name: string; url: string }>;
   error?: string;
+  kind?: string;
 }> {
   if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) {
     return { success: false, error: 'URL inválida' };
   }
+
+  // A leitura rápida da página e a captura na rede começam juntas: vale a que achar primeiro
+  const signal = { cancelled: false };
+  const sniffing = sniffMedia(pageUrl, { signal }).catch(() => null);
+  const done = <T,>(r: T): T => {
+    signal.cancelled = true;
+    return r;
+  };
 
   // 1. TENTATIVA RÁPIDA: Requisição estática via axios
   try {
@@ -1074,12 +1084,12 @@ async function extractVideoStream(pageUrl: string): Promise<{
     if (typeof html === 'string') {
       const videoSrcMatch = html.match(/<video[^>]+src="([^">]+)"/i) || html.match(/<source[^>]+src="([^">]+)"/i);
       if (videoSrcMatch && /^https?:\/\//i.test(videoSrcMatch[1])) {
-        return { success: true, type: 'stream', streamUrl: videoSrcMatch[1], url: videoSrcMatch[1], referer: pageUrl };
+        return done({ success: true, type: 'stream', streamUrl: videoSrcMatch[1], url: videoSrcMatch[1], referer: pageUrl, kind: /m3u8/i.test(videoSrcMatch[1]) ? 'hls' : 'mp4' });
       }
 
       const mediaMatch = html.match(/https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8)(?:\?[^\s"'<>]*)?/i);
       if (mediaMatch && !mediaMatch[0].includes('analytics') && !mediaMatch[0].includes('track') && !mediaMatch[0].includes('smartpop')) {
-        return { success: true, type: 'stream', streamUrl: mediaMatch[0], url: mediaMatch[0], referer: pageUrl };
+        return done({ success: true, type: 'stream', streamUrl: mediaMatch[0], url: mediaMatch[0], referer: pageUrl, kind: /m3u8/i.test(mediaMatch[0]) ? 'hls' : 'mp4' });
       }
 
       // Múltiplos mirrors/servidores em base64 (JavGuru e similares)
@@ -1149,10 +1159,10 @@ async function extractVideoStream(pageUrl: string): Promise<{
           for (const srv of ordered) {
             const hit = await sniffMedia(srv.url, { referer: pageUrl, timeoutMs: 20000 });
             if (hit) {
-              return { success: true, type: 'stream', streamUrl: hit.url, url: hit.url, referer: hit.referer, servers: discoveredServers };
+              return done({ success: true, type: 'stream', streamUrl: hit.url, url: hit.url, referer: hit.referer, servers: discoveredServers, kind: hit.kind });
             }
           }
-          return { success: false, error: 'Nenhum servidor entregou o vídeo', servers: discoveredServers };
+          // Nenhum servidor entregou: segue esperando a captura na própria página
         }
       }
 
@@ -1164,12 +1174,35 @@ async function extractVideoStream(pageUrl: string): Promise<{
   // 2. Abre a página escondida, aperta play nos players (inclusive em iframes) e captura o vídeo na rede.
   //    Nunca devolve a página do site: se não achar o vídeo, o player avisa e oferece outras fontes.
   try {
-    const hit = await sniffMedia(pageUrl);
-    if (hit) return { success: true, type: 'stream', streamUrl: hit.url, url: hit.url, referer: hit.referer };
+    const hit = await sniffing;
+    if (hit) return { success: true, type: 'stream', streamUrl: hit.url, url: hit.url, referer: hit.referer, kind: hit.kind };
   } catch (err: any) {
     console.warn('[extractVideoStream sniff failed]:', err?.message || err);
   }
   return { success: false, error: 'O site não entregou o vídeo' };
+}
+
+// Mesmo episódio aberto de novo (ou pré-carregado pelo player): devolve na hora
+const EXTRACT_TTL = 20 * 60 * 1000;
+const extractCache = new Map<string, { at: number; result: Awaited<ReturnType<typeof extractVideoStreamNow>> }>();
+const extracting = new Map<string, ReturnType<typeof extractVideoStreamNow>>();
+
+async function extractVideoStream(pageUrl: string) {
+  const hit = extractCache.get(pageUrl);
+  if (hit && Date.now() - hit.at < EXTRACT_TTL) return hit.result;
+  const running = extracting.get(pageUrl);
+  if (running) return running;
+  const job = extractVideoStreamNow(pageUrl)
+    .then((result) => {
+      if (result.success) {
+        extractCache.set(pageUrl, { at: Date.now(), result });
+        if (extractCache.size > 60) extractCache.delete(extractCache.keys().next().value as string);
+      }
+      return result;
+    })
+    .finally(() => extracting.delete(pageUrl));
+  extracting.set(pageUrl, job);
+  return job;
 }
 
 async function resolveAndCacheImage(imageUrl: string, sourceName?: string): Promise<{ success: boolean; url?: string; error?: string }> {
@@ -1340,7 +1373,7 @@ function setupIpcHandlers() {
         const ext = path.extname(entry.name).toLowerCase();
 
         const isImage = ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.bmp'].includes(ext);
-        const isVideo = ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.wmv', '.flv', '.ts', '.m4v'].includes(ext);
+        const isVideo = VIDEO_EXT.has(ext);
         const isArchive = ['.zip', '.cbz', '.rar', '.cbr', '.7z', '.tachibk'].includes(ext);
 
         let size = 0;
@@ -1432,9 +1465,9 @@ function setupIpcHandlers() {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: options?.title || 'Open File',
       filters: options?.filters || [
-        { name: 'All Supported Files', extensions: ['tachibk', 'zip', 'cbz', 'mp4', 'mkv', 'webm', 'jpg', 'png', 'webp'] },
+        { name: 'All Supported Files', extensions: ['tachibk', 'zip', 'cbz', 'mp4', 'm4v', 'mkv', 'webm', 'avi', 'mov', 'wmv', 'flv', 'ts', 'm2ts', 'mts', 'mpg', 'mpeg', '3gp', 'ogv', 'jpg', 'png', 'webp'] },
         { name: 'Tachiyomi/Aniyomi Backup (*.tachibk)', extensions: ['tachibk'] },
-        { name: 'Videos (*.mp4, *.mkv, *.webm, *.avi)', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov', 'wmv', 'flv'] },
+        { name: 'Videos', extensions: ['mp4', 'm4v', 'mkv', 'mk3d', 'webm', 'avi', 'divx', 'mov', 'wmv', 'asf', 'flv', 'f4v', 'ts', 'm2ts', 'mts', 'mpg', 'mpeg', 'm2v', '3gp', '3g2', 'ogv', 'ogm', 'vob', 'rm', 'rmvb', 'mxf', 'dv', 'wtv'] },
         { name: 'Images (*.jpg, *.png, *.webp)', extensions: ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'] },
         { name: 'All Files', extensions: ['*'] }
       ],
@@ -2393,7 +2426,7 @@ app.whenReady().then(() => {
       const headers = { ...details.requestHeaders };
       const url = details.url;
       // Streams de plugins do Nuvio: cabeçalhos exigidos pela fonte (Referer, Origin…)
-      const streamExtra = streamHeadersFor(url);
+      const streamExtra = streamHeadersFor(url, details.resourceType);
       if (streamExtra) {
         for (const [k, v] of Object.entries(streamExtra)) {
           for (const existing of Object.keys(headers)) if (existing.toLowerCase() === k.toLowerCase()) delete headers[existing];
@@ -2522,6 +2555,7 @@ app.whenReady().then(() => {
   registerTorrentIpc();
   registerSecretsIpc();
   registerMalIpc();
+  registerSiteFetchIpc();
   registerAniListAuthIpc(() => mainWindow);
   registerAdblockIpcHandlers();
   setupAdblocker();

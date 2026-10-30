@@ -76,6 +76,8 @@ Os executáveis são gerados automaticamente pelo GitHub Actions direto do códi
 - Navegador integrado com bloqueador de anúncios.
 - Sincronização com o AniList.
 - **Modo anônimo:** assista e leia sem salvar histórico nem progresso (botão ao lado de Doar).
+- **Rápido:** HLS toca direto no player (hls.js), o próximo episódio é preparado enquanto você assiste e MKV com H.264 é só reempacotado.
+- **Escolha de sites no "Onde assistir":** ligue/desligue extensões; a escolha e a obra achada ficam salvas para os próximos episódios.
 - **Tudo toca dentro do app:** o player acha o vídeo da página do episódio sozinho; se uma fonte falhar, ele oferece outras.
 - **Busca nas suas fontes:** só aparece o que as suas extensões, addons e plugins têm, do resultado mais parecido para o menos.
 - **MyAnimeList na busca:** completa os resultados com a nota e os nomes do MyAnimeList, sem precisar de chave (dá para usar a API oficial com o seu Client ID em Configurações → Contas).
