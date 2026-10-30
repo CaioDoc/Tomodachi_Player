@@ -17,6 +17,7 @@ import discover2 from './parts/discover2';
 import mal from './parts/mal';
 import search3 from './parts/search3';
 import speed from './parts/speed';
+import toggles from './parts/toggles';
 import updates from './parts/updates';
 
-export const DICTIONARY: Parts = Object.assign({}, core, app, library, player, settings, sources, browser, nuvio, help, sources2, videos2, bulk, discover2, updates, mal, search3, speed);
+export const DICTIONARY: Parts = Object.assign({}, core, app, library, player, settings, sources, browser, nuvio, help, sources2, videos2, bulk, discover2, updates, mal, search3, speed, toggles);

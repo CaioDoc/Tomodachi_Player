@@ -486,6 +486,14 @@ await step('Extensão (site) · acha a obra pela busca do site e toca o episódi
   const epButtons = (await page.locator('[role=dialog] .flex-wrap button.tabular-nums >> visible=true').allInnerTexts()).map((x) => x.trim());
   if (!chooser) throw new Error('a escolha de sites não aparece no Onde assistir');
   if (epButtons.join(',') !== '1,2,3') throw new Error('episódios errados na lista: ' + epButtons.join(','));
+  // Cada site tem seu botão liga/desliga (inclusive o que não respondeu); desligar fica salvo
+  const switches = await page.locator('[role=dialog] [role=switch][aria-label^="Buscar em"] >> visible=true').count();
+  if (switches < 2) throw new Error('os sites não têm o botão liga/desliga (' + switches + ')');
+  await page.locator('[role=dialog] [role=switch][aria-label="Buscar em Site Fora do Ar"] >> visible=true').first().click();
+  await sleep(500);
+  const offSaved = await page.evaluate(() => localStorage.getItem('tp_watch_ext_off') || '');
+  const offState = await page.locator('[role=dialog] [role=switch][aria-label="Buscar em Site Fora do Ar"]').first().getAttribute('aria-checked');
+  if (!/test\.dead/.test(offSaved) || offState !== 'false') throw new Error('desligar um site não ficou salvo: ' + offSaved + ' ' + offState);
   const t0 = Date.now();
   await playEp.click();
   // O vídeo do episódio (que está dentro de um iframe do player do site) toca no player do app
@@ -508,17 +516,29 @@ await step('Extensão (site) · acha a obra pela busca do site e toca o episódi
   if (webviews) throw new Error('abriu o site num navegador');
   if (!/sample\.mp4/.test(String(info?.src))) throw new Error('tocou a prévia em vez do episódio: ' + info?.src);
   if (!/test\.site/.test(cached)) throw new Error('não guardou a obra achada no site (o próximo episódio buscaria de novo)');
-  return `escolha de sites visível; episódios ${epButtons.join(',')}; tocou em ${secs}s pelo player do app (${String(info?.src).slice(0, 60)})`;
+  return `${switches} sites com liga/desliga; episódios ${epButtons.join(',')}; tocou em ${secs}s pelo player do app (${String(info?.src).slice(0, 60)})`;
 });
 
-await step('Onde assistir · desligar um site fica salvo', async () => {
-  const off = await page.evaluate(() => {
-    localStorage.setItem('tp_watch_ext_off', JSON.stringify(['test.site']));
-    return localStorage.getItem('tp_watch_ext_off');
-  });
+await step('Fontes · Browse abre o site com "Assistir no app"', async () => {
   await page.evaluate(() => localStorage.removeItem('tp_watch_ext_off'));
-  if (off !== '["test.site"]') throw new Error('não salvou');
-  return 'salvo';
+  await goSection('Animes & Vídeos');
+  await goTab('Fontes');
+  await sleep(1200);
+  const tabsBefore = await page.locator('[draggable=true]').count();
+  const target = page.locator('div.flex.items-center.gap-3:has(span:text-is("Site Teste")) button[title="Abrir esta fonte para navegar"] >> visible=true').first();
+  await target.waitFor({ timeout: 15000 });
+  await target.click();
+  await page.waitForFunction((k) => document.querySelectorAll('[draggable=true]').length > k, tabsBefore, { timeout: 20000 });
+  await sleep(2500);
+  await shot(page, 'fontes-browse');
+  const watchBtn = await page.locator('button:has-text("Assistir no app") >> visible=true').count();
+  const epsBtn = await page.locator('button:has-text("Episódios no app") >> visible=true').count();
+  const webviews = await page.locator('webview').count();
+  await page.keyboard.press('Control+w').catch(() => {});
+  await sleep(600);
+  if (!webviews) throw new Error('Browse não mostrou a página do site');
+  if (!watchBtn || !epsBtn) throw new Error('faltam os botões para assistir no app');
+  return 'abriu a página do site com "Assistir no app" e "Episódios no app"';
 });
 
 await step('Configurações · cartão do MyAnimeList', async () => {

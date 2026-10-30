@@ -624,3 +624,13 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
   - o jeito de buscar que funcionou fica salvo mesmo sem achar a obra; site sem busca própria tenta só 1 endereço nas próximas vezes;
   - site fora do ar é pulado por 10–30 min; site com proteção vai direto para o modo navegador; página de erro do navegador não conta como resultado.
 - **"Formato não suportado":** a página do episódio pode ter vários vídeos (prévias de outras obras, trailers, anúncios). Agora o app escolhe o episódio (o maior/mais longo) e descarta prévias; se mesmo assim o vídeo não abrir, o player avisa e "Procurar outro vídeo na página" tenta outro, sem repetir o que falhou.
+
+## Browse mostra o site, busca nas fontes que funciona e liga/desliga por site (1.7.0-beta)
+
+| Pedido | O que mudou |
+|---|---|
+| "Browse" em Fontes deve mostrar a página do site | O botão **Browse** de uma extensão de vídeo abre a página do próprio site numa aba do app. A barra ganha dois botões: **Assistir no app**, que toca o vídeo da página aberta no player do app, e **Episódios no app**, que abre a obra com a lista de episódios. |
+| A busca dentro do Browse não achava o que existe | A busca no catálogo de uma extensão agora usa o formulário de busca do próprio site, o mesmo do "Onde assistir", e ordena pelo que mais combina. Em addons cujo catálogo não tem busca, o app lê várias páginas e filtra pelo nome. O campo de busca não fica mais desativado. |
+| "Watch" busca sozinho em todas as extensões, cada uma com um toggle | O "Onde assistir" busca automaticamente em todos os sites ligados. **Cada site tem um botãozinho liga/desliga**: os que acharam, os que não acharam, os que não responderam e os desligados. Desligar para a busca naquele site, ligar busca na hora, e a escolha fica salva para os próximos episódios e obras. No topo há "Buscando em N de M sites", com **Ligar todos** e **Desligar todos**. |
+
+Teste automático novo: **Fontes → Browse** abre a página do site com "Assistir no app". O teste do "Onde assistir" agora confere que todos os sites têm o liga/desliga e que desligar um fica salvo.

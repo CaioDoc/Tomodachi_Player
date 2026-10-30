@@ -229,7 +229,7 @@ const BrowseBtn: React.FC<{ onClick: () => void }> = ({ onClick }) => (
     type="button"
     onClick={onClick}
     className="h-8 px-3 rounded-md bg-subtle hover:bg-elevated border border-line-subtle text-[12px] text-fg inline-flex items-center gap-1.5 cursor-pointer shrink-0"
-    title={t('Navegar pelo catálogo desta fonte')}
+    title={t('Abrir esta fonte para navegar')}
   >
     <Compass size={13} /> {t('Navegar')}
   </button>
@@ -485,7 +485,14 @@ const AvailableExtensions: React.FC<{ installed: InstalledExtension[] }> = ({ in
 /* ───────────────────────── Tela ───────────────────────── */
 
 export const SourcesManager: React.FC<{ onOpenTab?: OpenTabFn }> = ({ onOpenTab }) => {
-  const onBrowseExtension = (ext: InstalledExtension) => onOpenTab?.('extension-catalog', ext.name, { extension: ext, mediaType: 'video' });
+  // "Navegar" numa extensão de vídeo: abre o próprio site (busca do site, páginas reais) no navegador do app,
+  // com "Assistir no app" e "Episódios no app" para tocar no player
+  const onBrowseExtension = (ext: InstalledExtension) => {
+    const raw = String(ext.baseUrl || '').trim();
+    const url = raw ? (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`) : '';
+    if (!url) return onOpenTab?.('extension-catalog', ext.name, { extension: ext, mediaType: 'video' });
+    onOpenTab?.('webview', ext.name, { url, initialUrl: url, videoSource: { name: ext.name, pkg: ext.pkg } });
+  };
   const [state, setState] = useState(getNuvioState);
   const [installed, setInstalled] = useState(() => getInstalledExtensions('anime'));
   const [filter, setFilter] = useState<Filter>('all');

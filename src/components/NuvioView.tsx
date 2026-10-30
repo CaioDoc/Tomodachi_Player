@@ -1,6 +1,7 @@
 // src/components/NuvioView.tsx
 // Aba "Nuvio" em Animes & Vídeos: catálogo (Cinemeta) + gerenciador de plugins.
 
+import { relevance, MIN_RELEVANCE } from '../utils/relevance';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -547,9 +548,23 @@ export const Catalog: React.FC<{
       setError(null);
       try {
         const skip = reset ? 0 : items.length;
-        let list = addonRef
-          ? await fetchAddonCatalog(addonRef, { search: searchText, genre: genre || parsedQ.genres[0] || undefined, skip })
-          : await nuvioCatalog(type, { search: searchText, genre: effectiveGenre || undefined, skip });
+        let list: NuvioMetaPreview[];
+        if (addonRef && searchText && !addonRef.searchable) {
+          // Catálogo sem busca própria: procura o nome nas primeiras páginas
+          const all: NuvioMetaPreview[] = [];
+          for (let page = 0; page < 6 && id === reqId.current; page++) {
+            const chunk = await fetchAddonCatalog(addonRef, { genre: genre || parsedQ.genres[0] || undefined, skip: all.length }).catch(() => []);
+            if (!chunk.length) break;
+            all.push(...chunk);
+          }
+          list = all.filter((m) => relevance(m.name, searchText) >= MIN_RELEVANCE);
+        } else {
+          list = addonRef
+            ? await fetchAddonCatalog(addonRef, { search: searchText, genre: genre || parsedQ.genres[0] || undefined, skip })
+            : await nuvioCatalog(type, { search: searchText, genre: effectiveGenre || undefined, skip });
+        }
+        // Busca: o que mais bate com o texto primeiro
+        if (searchText) list = [...list].sort((a, b) => relevance(b.name, searchText) - relevance(a.name, searchText));
         // Vários gêneros (ou gênero + texto): o catálogo filtra um, o resto é filtrado aqui
         const need = [...parsedQ.genres, ...(kind === 'anime' ? ['Animation'] : [])].map((g) => g.toLowerCase());
         if (need.length && (searchText || parsedQ.genres.length > 1)) {

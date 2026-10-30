@@ -69,7 +69,7 @@ const RESTORABLE: TabType[] = ['mangas', 'videos', 'settings-repos', 'webview', 
 const serializeTab = (t: TabItem): TabItem | null => {
   if (!RESTORABLE.includes(t.type)) return null;
   let data = t.data;
-  if (t.type === 'webview') data = { url: t.data?.url || t.data?.initialUrl, initialUrl: t.data?.url || t.data?.initialUrl };
+  if (t.type === 'webview') data = { url: t.data?.url || t.data?.initialUrl, initialUrl: t.data?.url || t.data?.initialUrl, videoSource: t.data?.videoSource };
   try {
     const json = JSON.stringify(data ?? null);
     if (json.length > 150_000) return null; // evita estourar o armazenamento
@@ -670,6 +670,8 @@ export const App: React.FC = () => {
             initialUrl={tab.data?.initialUrl || tab.data?.url || DEFAULT_BROWSER_URL}
             onUpdateTitle={(t) => handleUpdateTabTitle(tab.id, t)}
             onUrlChange={(u) => handleUpdateTabUrl(tab.id, u)}
+            videoSource={tab.data?.videoSource}
+            onOpenTab={handleOpenTab}
           />
         );
       case 'manga-local':

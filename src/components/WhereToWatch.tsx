@@ -5,7 +5,7 @@
 // O usuário não precisa saber de onde vem cada link.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Puzzle, Loader2, ChevronLeft, ChevronRight, ChevronDown, Play, RefreshCw, Plus, Globe, Zap, Pencil, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Puzzle, Loader2, ChevronLeft, ChevronRight, Play, RefreshCw, Plus, Globe, Zap, Pencil, Search, SlidersHorizontal } from 'lucide-react';
 import {
   animeExtensionsFor,
   searchInExtension,
@@ -73,13 +73,6 @@ function setExtOn(pkg: string, on: boolean) {
   else off.add(pkg);
   writeOff(off);
 }
-const neverChose = () => {
-  try {
-    return !localStorage.getItem(CHOSEN_KEY) && !localStorage.getItem(OFF_KEY);
-  } catch {
-    return false;
-  }
-};
 
 /* Obra já achada em cada site: o próximo episódio não precisa buscar de novo */
 const MATCH_KEY = 'tp_watch_match_cache';
@@ -126,6 +119,24 @@ async function cachedEpisodes(ext: InstalledExtension, url: string): Promise<Ext
   return list;
 }
 
+/** Botãozinho liga/desliga de cada site */
+const SiteSwitch: React.FC<{ on: boolean; name: string; onChange: (on: boolean) => void }> = ({ on, name, onChange }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={on}
+    aria-label={t('Buscar em {site}', { site: name })}
+    title={on ? t('Ligado: clique para não buscar neste site (fica salvo)') : t('Desligado: clique para buscar neste site')}
+    onClick={(e) => {
+      e.stopPropagation();
+      onChange(!on);
+    }}
+    className={`relative w-7 h-4 rounded-full shrink-0 transition-colors cursor-pointer ${on ? 'bg-accent' : 'bg-elevated border border-line'}`}
+  >
+    <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${on ? 'left-[13px]' : 'left-0.5'}`} />
+  </button>
+);
+
 const ExtensionCard: React.FC<{
   ext: InstalledExtension;
   state: ExtState;
@@ -133,9 +144,9 @@ const ExtensionCard: React.FC<{
   episode: number;
   onPlay: (ext: InstalledExtension, ep: ExtensionEpisode | null, match: ExtensionMatch) => void;
   onPicked?: (match: ExtensionMatch | null) => void;
-  /** Para de buscar neste site (fica salvo) */
-  onSkip?: () => void;
-}> = ({ ext, state, req, episode, onPlay, onPicked, onSkip }) => {
+  /** Botão para ligar/desligar a busca neste site */
+  toggle?: React.ReactNode;
+}> = ({ ext, state, req, episode, onPlay, onPicked, toggle }) => {
   const [picked, setPicked] = useState<ExtensionMatch | null>(null);
   const [eps, setEps] = useState<ExtensionEpisode[] | null>(null);
   const [loadingEps, setLoadingEps] = useState(false);
@@ -184,17 +195,7 @@ const ExtensionCard: React.FC<{
           ) : picked ? null : (
             tn(state.matches.length, '{n} resultado', '{n} resultados')
           )}
-          {onSkip && (
-            <button
-              type="button"
-              onClick={onSkip}
-              className="ml-1 p-0.5 rounded text-fg-muted hover:text-fg hover:bg-subtle cursor-pointer"
-              title={t('Não buscar neste site (fica salvo; dá para religar em "Escolher sites")')}
-              aria-label={t('Não buscar em {site}', { site: ext.name })}
-            >
-              <X size={12} />
-            </button>
-          )}
+          {toggle && <span className="ml-1.5 inline-flex">{toggle}</span>}
         </span>
       </div>
 
@@ -300,9 +301,7 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
     for (const pkg of off) if (signals.current[pkg]) signals.current[pkg].cancelled = true;
   }, [off]);
   const [states, setStates] = useState<Record<string, ExtState>>({});
-  const [showEmpty, setShowEmpty] = useState(false);
   // Muitos sites e nenhuma escolha feita ainda: já mostra a lista para marcar/desmarcar
-  const [choosing, setChoosing] = useState(() => animeExtensionsFor(req).length > 5 && neverChose());
   const signals = useRef<Record<string, { cancelled: boolean }>>({});
   const reqRef = useRef(req);
   reqRef.current = req;
@@ -386,7 +385,17 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
   const list = exts.map((e) => ({ ext: e, state: states[e.pkg] || { status: 'idle' as const, matches: [] } }));
   const searching = list.filter((x) => x.state.status === 'searching' || x.state.status === 'idle').length;
   const found = list.filter((x) => x.state.status === 'done' && x.state.matches.length > 0).length;
-  const empty = list.filter((x) => (x.state.status === 'done' && x.state.matches.length === 0) || x.state.status === 'error');
+  const onCount = exts.length;
+  // Ordem: com resultado → buscando → sem resultado → desligados
+  const rank = (pkg: string) => {
+    if (off.has(pkg)) return 3;
+    const st = states[pkg];
+    if (st?.status === 'done' && st.matches.length > 0) return 0;
+    if (!st || st.status === 'searching' || st.status === 'idle') return 1;
+    return 2;
+  };
+  const ordered = [...allExts].sort((a, b) => rank(a.pkg) - rank(b.pkg));
+  const multi = allExts.length > 1;
 
   return (
     <div>
@@ -400,79 +409,55 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
           </button>
         }
       />
-      {allExts.length > 1 && (
-        <div className="mx-3 mb-2 rounded-lg border border-accent/30 bg-accent/5" data-testid="site-chooser">
-          <button type="button" onClick={() => setChoosing((v) => !v)} aria-expanded={choosing} className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer">
-            <SlidersHorizontal size={13} className="text-accent shrink-0" />
-            <span className="text-[12px] text-fg">{t('Buscando em {n} de {total} sites', { n: allExts.length - [...off].filter((p) => allExts.some((e) => e.pkg === p)).length, total: allExts.length })}</span>
-            <span className="ml-auto text-[11.5px] text-accent font-semibold inline-flex items-center gap-0.5">
-              {choosing ? t('Fechar') : t('Escolher sites')} {choosing ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            </span>
-          </button>
-          {choosing && (
-            <div className="px-3 pb-3">
-              <p className="text-[11px] text-fg-muted mb-2">{t('Marque só os sites onde quer procurar. Menos sites = busca mais rápida. A escolha fica salva para os próximos episódios e obras.')}</p>
-              <div className="flex items-center gap-3 mb-2 text-[11.5px]">
-                <button type="button" onClick={() => writeOff(new Set())} className="text-accent hover:underline cursor-pointer">
-                  {t('Marcar todos')}
-                </button>
-                <button type="button" onClick={() => writeOff(new Set(allExts.map((e) => e.pkg)))} className="text-fg-muted hover:text-fg hover:underline cursor-pointer">
-                  {t('Desmarcar todos')}
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-1 max-h-64 overflow-y-auto pr-1">
-                {allExts.map((e) => {
-                  const on = !off.has(e.pkg);
-                  return (
-                    <label key={e.pkg} className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-[12px] ${on ? 'bg-surface text-fg' : 'text-fg-muted hover:bg-subtle'}`}>
-                      <input type="checkbox" checked={on} onChange={() => setExtOn(e.pkg, !on)} className="accent-accent w-3.5 h-3.5 cursor-pointer" />
-                      <span className="truncate">{e.name}</span>
-                      <span className="ml-auto text-[9.5px] uppercase font-mono text-fg-muted">{e.lang}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+      {multi && (
+        <div className="mx-3 mb-2 px-3 py-2 rounded-lg border border-accent/30 bg-accent/5 flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="site-chooser">
+          <SlidersHorizontal size={13} className="text-accent shrink-0" />
+          <span className="text-[12px] text-fg">{t('Buscando em {n} de {total} sites', { n: onCount, total: allExts.length })}</span>
+          <span className="text-[11px] text-fg-muted">{t('use o botão de cada site para ligar/desligar (fica salvo)')}</span>
+          <span className="ml-auto inline-flex items-center gap-3 text-[11.5px]">
+            <button type="button" onClick={() => writeOff(new Set())} className="text-accent hover:underline cursor-pointer">
+              {t('Ligar todos')}
+            </button>
+            <button type="button" onClick={() => writeOff(new Set(allExts.map((e) => e.pkg)))} className="text-fg-muted hover:text-fg hover:underline cursor-pointer">
+              {t('Desligar todos')}
+            </button>
+          </span>
         </div>
       )}
-      {exts.length === 0 && <p className="px-4 pb-2 text-[12px] text-fg-muted">{t('Todos os sites estão desligados. Ligue algum acima para buscar.')}</p>}
-      {list
-        .filter((x) => x.state.status !== 'idle')
-        .map(({ ext, state }) => (
-          <ExtensionCard
-            key={ext.pkg}
-            ext={ext}
-            req={req}
-            episode={episode}
-            state={state}
-            onPlay={play}
-            onPicked={(m) => rememberMatch(req, ext.pkg, m)}
-            onSkip={allExts.length > 1 ? () => setExtOn(ext.pkg, false) : undefined}
-          />
-        ))}
       {exts.length > 0 && searching === 0 && found === 0 && <p className="px-4 pb-2 text-[12px] text-fg-muted">{t('Nenhum site encontrou “{title}”.', { title: req.title })}</p>}
-      {empty.length > 0 && found > 0 && (
-        <div className="px-4 pb-2">
-          <button type="button" onClick={() => setShowEmpty((v) => !v)} className="text-[11px] text-fg-muted hover:text-fg inline-flex items-center gap-1 cursor-pointer">
-            {showEmpty ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-            {tn(empty.length, '{n} site sem resultado', '{n} sites sem resultado')}
-          </button>
-        </div>
-      )}
-      {empty.length > 0 && (showEmpty || found === 0) && searching === 0 && (
-        <ul className="px-4 pb-2 space-y-0.5">
-          {empty.map((x) => (
-            <li key={x.ext.pkg} className="flex items-center gap-2 text-[11px] text-fg-muted">
-              <Globe size={10} className="shrink-0" />
-              <span className="text-fg-2 truncate">{x.ext.name}</span>
-              <span className="truncate" title={x.state.error}>
-                · {x.state.status === 'error' ? t('o site não respondeu') : t('nada encontrado')}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {exts.length === 0 && <p className="px-4 pb-2 text-[12px] text-fg-muted">{t('Todos os sites estão desligados. Ligue algum abaixo para buscar.')}</p>}
+      {ordered.map((ext) => {
+        const on = !off.has(ext.pkg);
+        const state = states[ext.pkg] || { status: 'idle' as const, matches: [] };
+        const toggle = multi ? <SiteSwitch on={on} name={ext.name} onChange={(v) => setExtOn(ext.pkg, v)} /> : null;
+        // Ligado e achou (ou ainda buscando): card completo com resultados e episódios
+        if (on && (state.status === 'searching' || state.status === 'idle' || (state.status === 'done' && state.matches.length > 0))) {
+          return (
+            <ExtensionCard
+              key={ext.pkg}
+              ext={ext}
+              req={req}
+              episode={episode}
+              state={state.status === 'idle' ? { status: 'searching', matches: [] } : state}
+              onPlay={play}
+              onPicked={(m) => rememberMatch(req, ext.pkg, m)}
+              toggle={toggle}
+            />
+          );
+        }
+        // Sem resultado, sem resposta ou desligado: linha compacta, com o botão para ligar/desligar
+        return (
+          <div key={ext.pkg} className={`mx-3 mb-1.5 px-3 py-1.5 rounded-lg border border-line-subtle flex items-center gap-2 ${on ? 'bg-canvas/30' : 'bg-transparent opacity-70'}`} data-site-row={ext.pkg}>
+            <Globe size={12} className="text-fg-muted shrink-0" />
+            <span className={`text-[12px] truncate ${on ? 'text-fg-2' : 'text-fg-muted'}`}>{ext.name}</span>
+            <span className="text-[10px] uppercase text-fg-muted font-mono">{ext.lang}</span>
+            <span className="ml-auto text-[11px] text-fg-muted truncate" title={state.error}>
+              {!on ? t('desligado') : state.status === 'error' ? t('o site não respondeu') : t('nada encontrado')}
+            </span>
+            {toggle}
+          </div>
+        );
+      })}
     </div>
   );
 };

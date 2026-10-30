@@ -1,4 +1,6 @@
 // src/components/ExtensionCatalogView.tsx
+import { searchSite } from '../api/siteSearch';
+import { relevance, MIN_RELEVANCE } from '../utils/relevance';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Compass,
@@ -541,13 +543,26 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
       // faz o scraping real diretamente da fonte da extensão, garantindo capas e títulos 100% autênticos
       if (window.electronAPI?.scrapeExtensionCatalog && rawDomain && !rawDomain.includes('anilist.co')) {
         let isCancelled = false;
-        window.electronAPI
-          .scrapeExtensionCatalog({
-            baseUrl: rawDomain || targetWebUrl,
-            query: debouncedQuery,
-            page: targetPage,
-            sourceName: extName,
-          })
+        // Com texto na busca: usa a busca do próprio site (formulário do site + leitura dos cards)
+        const q = String(debouncedQuery || '').trim();
+        const job: Promise<{ success: boolean; items: any[] }> =
+          q
+            ? searchSite(rawDomain || targetWebUrl, q, (cand) => relevance(cand, q) / 100)
+                .then((items) => ({
+                  success: true,
+                  items: items
+                    .filter((it) => relevance(it.title, q) >= MIN_RELEVANCE)
+                    .sort((x, y) => relevance(y.title, q) - relevance(x.title, q))
+                    .map((it) => ({ title: it.title, url: it.url, cover: it.cover || '' })),
+                }))
+                .catch(() => ({ success: false, items: [] }))
+            : window.electronAPI.scrapeExtensionCatalog({
+                baseUrl: rawDomain || targetWebUrl,
+                query: debouncedQuery,
+                page: targetPage,
+                sourceName: extName,
+              });
+        job
           .then((res) => {
             if (isCancelled) return;
             if (res?.success && Array.isArray(res.items) && res.items.length > 0) {

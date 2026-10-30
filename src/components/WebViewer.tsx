@@ -25,7 +25,9 @@ import {
   BookmarkCheck,
   Check,
   Folder,
-  Puzzle
+  Puzzle,
+  Play,
+  ListVideo
 } from 'lucide-react';
 import { useIsTabActive } from '../context/TabContext';
 import { parseAnyBookmarksTree, exportBookmarksToHtml, mergeBookmarkTrees, getFaviconUrl } from '../utils/bookmarkParser';
@@ -38,6 +40,9 @@ interface WebViewerProps {
   onUpdateTitle?: (title: string) => void;
   /** Notifica o endereço atual (usado para restaurar a sessão) */
   onUrlChange?: (url: string) => void;
+  /** Aberto pelo "Navegar" de uma extensão de vídeo: mostra "Assistir no app" e "Episódios no app" */
+  videoSource?: { name: string; pkg: string };
+  onOpenTab?: (type: any, title: string, data?: any) => void;
 }
 
 const DEFAULT_URL = 'https://duckduckgo.com';
@@ -47,6 +52,8 @@ export const WebViewer: React.FC<WebViewerProps> = ({
   initialUrl = DEFAULT_URL,
   onUpdateTitle,
   onUrlChange,
+  videoSource,
+  onOpenTab,
 }) => {
   const onUrlChangeRef = useRef(onUrlChange);
   onUrlChangeRef.current = onUrlChange;
@@ -500,6 +507,34 @@ export const WebViewer: React.FC<WebViewerProps> = ({
             </button>
           </div>
         </form>
+
+        {/* Site de uma extensão de vídeo: o vídeo da página toca no player do app */}
+        {videoSource && onOpenTab && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                const title = (currentTitle || '').trim() || videoSource.name;
+                onOpenTab('video-player', title, { filePath: url, title, item: { path: url, name: title }, episodeUrl: url, work: { title } });
+              }}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-accent hover:bg-accent-hover text-accent-fg text-[12px] font-semibold shrink-0 cursor-pointer"
+              title={t('Toca o vídeo desta página no player do app')}
+            >
+              <Play size={13} fill="currentColor" /> {t('Assistir no app')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const title = (currentTitle || '').replace(/\s*[|–—-]\s*[^|–—-]*$/, '').trim() || videoSource.name;
+                onOpenTab('anime-detail', title, { anime: { url, title, cover: '', source: videoSource.pkg, sourceName: videoSource.name, chapters: [], favorite: false, categories: [] } });
+              }}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-subtle hover:bg-elevated border border-line text-[12px] text-fg shrink-0 cursor-pointer"
+              title={t('Abre esta obra no app, com a lista de episódios')}
+            >
+              <ListVideo size={13} /> {t('Episódios no app')}
+            </button>
+          </>
+        )}
 
         {/* Extensões com painel (como os ícones do Chrome) */}
         {quickExtensions.map((ext) => (

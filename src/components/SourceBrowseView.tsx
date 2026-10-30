@@ -75,10 +75,9 @@ export const SourceBrowseView: React.FC<{ target: SourceBrowseTarget; onOpenTab?
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted" />
             <input
               value={input}
-              disabled={!current?.searchable}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && setQuery(input.trim())}
-              placeholder={current?.searchable ? t('Buscar em {name}…', { name: current.label }) : t('Este catálogo não tem busca')}
+              placeholder={t('Buscar em {name}…', { name: current?.label || target.name })}
               className="w-full h-9 bg-canvas border border-line focus:border-accent rounded-lg pl-9 pr-8 text-[13px] text-fg outline-none disabled:opacity-60"
             />
             {input && (
@@ -130,7 +129,7 @@ export const SourceBrowseView: React.FC<{ target: SourceBrowseTarget; onOpenTab?
           (current.kind ? (
             <Catalog key={current.id} onOpenTab={onOpenTab} embedded={{ kind: current.kind, query }} />
           ) : (
-            <Catalog key={current.id} onOpenTab={onOpenTab} embedded={{ sourceKey: current.id, query: current.searchable ? query : '' }} />
+            <Catalog key={current.id} onOpenTab={onOpenTab} embedded={{ sourceKey: current.id, query }} />
           ))}
       </div>
     </div>
