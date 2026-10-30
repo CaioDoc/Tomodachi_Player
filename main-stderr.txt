@@ -1,0 +1,8 @@
+(node:2956) electron: Failed to load URL: http://127.0.0.1:47899/ with error: ERR_CONNECTION_REFUSED
+(Use `Tomodachi Player --trace-warnings ...` to show where the warning was created)
+Debugger ending on ws://127.0.0.1:49345/8d05c05b-33f9-4a40-86b3-058d496f611c
+For help, see: https://nodejs.org/en/docs/inspector
+[6052:1030/190456.264:ERROR:interface_endpoint_client.cc(725)] Message 6 rejected by interface blink.mojom.WidgetHost
+[6052:1030/190456.264:ERROR:interface_endpoint_client.cc(725)] Message 7 rejected by interface blink.mojom.WidgetHost
+Debugger ending on ws://127.0.0.1:49553/f45c65e3-7ca3-4e52-bf61-9fbac98e1715
+For help, see: https://nodejs.org/en/docs/inspector

@@ -1,0 +1,6 @@
+[mediaProtocol] Request URL: media://stream/D%3A%5Ca%5C_temp%5Ctp-media%5Ctp-formats%5Cfmt-mkv.mkv
+[mediaProtocol] Resolved file path: "D:\a\_temp\tp-media\tp-formats\fmt-mkv.mkv" (transcode: false, startTime: 0)
+[mediaProtocol] Request URL: media://stream/D%3A%5Ca%5C_temp%5Ctp-media%5Ctp-formats%5Cfmt-avi.avi
+[mediaProtocol] Resolved file path: "D:\a\_temp\tp-media\tp-formats\fmt-avi.avi" (transcode: false, startTime: 0)
+[mediaProtocol] Request URL: media://stream/D%3A%5Ca%5C_temp%5Ctp-media%5Ctp-formats%5Cfmt-ac3.mp4
+[mediaProtocol] Resolved file path: "D:\a\_temp\tp-media\tp-formats\fmt-ac3.mp4" (transcode: false, startTime: 0)
