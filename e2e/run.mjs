@@ -59,7 +59,8 @@ http
     res.writeHead(404, { 'Content-Type': 'text/html' });
     res.end(page404);
   })
-  .listen(SITE_PORT, '127.0.0.1');
+  .listen(SITE_PORT, '127.0.0.1')
+  .unref(); // não segura o teste aberto no fim
 
 async function launch(tag) {
   const t0 = Date.now();
@@ -767,3 +768,4 @@ const md = [
 ].join('\n');
 fs.writeFileSync(path.join(OUT, 'RESULTADO.md'), md);
 log('done', results.filter((r) => !r.ok).length, 'falhas');
+process.exit(0);
