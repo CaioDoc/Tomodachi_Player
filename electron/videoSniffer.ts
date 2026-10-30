@@ -160,8 +160,10 @@ function sniffOnce(pageUrl: string, slot: string, opts: SniffOptions): Promise<S
       const prev = cands.get(url);
       cands.set(url, { ...hit, weight: Math.max(weight, prev?.weight || 0), order: prev?.order ?? cands.size });
       if (!best) best = hit;
-      // Espera um pouco por outros vídeos (um m3u8, ou o mp4 grande do episódio) antes de escolher
-      if (!mp4Timer) mp4Timer = setTimeout(() => finish(pickBest()), 4000);
+      // Vídeo claramente do tamanho de um episódio (> 20 MB, ou > 3 min de duração): toca já
+      if (!LOOKS_PREVIEW.test(url) && weight >= 20e6) return finish(pickBest());
+      // Senão espera um pouco por outros vídeos (um m3u8, ou o mp4 grande do episódio) antes de escolher
+      if (!mp4Timer) mp4Timer = setTimeout(() => finish(pickBest()), 2500);
     };
 
     const hardTimer = setTimeout(() => finish(pickBest()), timeoutMs);
