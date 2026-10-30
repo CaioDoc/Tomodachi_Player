@@ -22,7 +22,9 @@ import {
   Scan,
   CheckCircle2,
   X,
+  VenetianMask,
 } from 'lucide-react';
+import { useIncognito } from '../utils/incognito';
 import { toMediaUrl } from '../utils/mediaUrl';
 import { useIsTabActive, isTypingTarget } from '../context/TabContext';
 import { updateChapterProgress } from '../utils/progress';
@@ -297,6 +299,7 @@ export const MangaReader: React.FC<MangaReaderProps> = ({
   const prevChapter = chapterIndex > 0 ? orderedChapters[chapterIndex - 1] : undefined;
   const nextChapter = chapterIndex >= 0 && chapterIndex < orderedChapters.length - 1 ? orderedChapters[chapterIndex + 1] : undefined;
   const currentChapter = chapterIndex >= 0 ? orderedChapters[chapterIndex] : undefined;
+  const [incognito] = useIncognito('manga');
 
   /* ── Progresso ── */
   useEffect(() => {
@@ -304,7 +307,7 @@ export const MangaReader: React.FC<MangaReaderProps> = ({
     if (!chapterUrl || total === 0) return;
     const isLast = currentPage >= total - step;
     const timer = window.setTimeout(() => {
-      updateChapterProgress('manga', { [chapterUrl]: isLast ? { lastPageRead: currentPage + 1, read: true } : { lastPageRead: currentPage + 1 } }, { silent: !isLast });
+      updateChapterProgress('manga', { [chapterUrl]: isLast ? { lastPageRead: currentPage + 1, read: true } : { lastPageRead: currentPage + 1 } }, { silent: !isLast, auto: true });
     }, 400);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -589,8 +592,13 @@ export const MangaReader: React.FC<MangaReaderProps> = ({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="text-accent shrink-0">{icon || <BookOpen size={16} />}</span>
           <div className="min-w-0">
-            <div className="font-semibold text-fg truncate text-[13px] leading-tight" title={displayTitle}>
-              {displayTitle}
+            <div className="font-semibold text-fg truncate text-[13px] leading-tight flex items-center gap-1.5" title={displayTitle}>
+              <span className="truncate">{displayTitle}</span>
+              {incognito && (
+                <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-500/20 border border-violet-400/40 text-violet-200 text-[10.5px] font-semibold" title={t('Modo anônimo: nada deste {what} fica salvo', { what: t('capítulo') })}>
+                  <VenetianMask size={11} /> {t('Anônimo')}
+                </span>
+              )}
             </div>
             {currentChapter && orderedChapters.length > 1 && (
               <div className="text-[10.5px] text-fg-muted leading-tight">

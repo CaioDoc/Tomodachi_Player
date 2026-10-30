@@ -24,7 +24,6 @@ import {
 import type { TabType } from '../types';
 import type { RepoExtension } from '../api/repositories';
 import type { InstalledExtension } from '../api/extensionRegistry';
-import { buildAnimeWatchWebUrl } from '../api/extensionRegistry';
 import type { LibraryItem } from './MihonLibrary';
 import { getMangaList, getMangaDexCoverUrl, type MangaDexManga } from '../api/mangadex';
 import { FavoriteTagModal } from './FavoriteTagModal';
@@ -781,15 +780,6 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
     });
   };
 
-  const handleWatchInWebview = (animeTitle: string, epNum: number = 1) => {
-    const fullTitle = `${animeTitle}${epNum > 1 ? ` - ${t('Ep. {n}', { n: epNum })}` : ''}`;
-    const url = buildAnimeWatchWebUrl(animeTitle, epNum, extName, targetWebUrl);
-    onOpenTab?.('webview', t('Assistir: {title}', { title: fullTitle }), {
-      url,
-      initialUrl: url,
-    });
-  };
-
   const bulk = useBulkSelection<LibraryItem>();
   const [bulkOpen, setBulkOpen] = useState(false);
   const isFavoritedInLibrary = (itemObj: LibraryItem) => libraryMangas.some((m) => m.url === itemObj.url && m.favorite);
@@ -902,15 +892,18 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
             </span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleOpenWebview}
-            className="px-3 py-1.5 rounded-md bg-subtle hover:bg-elevated border border-line text-accent hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 shadow-xs cursor-pointer"
-            title={t('Abrir website oficial na Webview interna')}
-          >
-            <Globe size={13} />
-            <span className="hidden sm:inline">Webview</span>
-          </button>
+          {/* Vídeos tocam sempre no player do app: o site da fonte só aparece para mangás */}
+          {!isVideo && (
+            <button
+              type="button"
+              onClick={handleOpenWebview}
+              className="px-3 py-1.5 rounded-md bg-subtle hover:bg-elevated border border-line text-accent hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 shadow-xs cursor-pointer"
+              title={t('Abrir website oficial na Webview interna')}
+            >
+              <Globe size={13} />
+              <span className="hidden sm:inline">Webview</span>
+            </button>
+          )}
         </div>
       </div>
 

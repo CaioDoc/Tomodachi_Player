@@ -61,12 +61,12 @@ export const MyAnimeListCard: React.FC = () => {
           <h2 className="text-sm font-semibold text-fg">MyAnimeList</h2>
         </div>
         <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-          <span className="text-xs text-fg-2">{t('Buscar no MyAnimeList')}</span>
+          <span className="text-xs text-fg-2">{t('Usar na busca')}</span>
           <button
             type="button"
             role="switch"
             aria-checked={enabled}
-            aria-label={t('Mostrar resultados do MyAnimeList na busca')}
+            aria-label={t('Usar o MyAnimeList na busca')}
             onClick={() => setMalSearchEnabled(!enabled)}
             className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${enabled ? 'bg-accent' : 'bg-elevated border border-line'}`}
           >
@@ -76,7 +76,7 @@ export const MyAnimeListCard: React.FC = () => {
       </div>
 
       <p className="text-xs text-fg-muted leading-relaxed">
-        {t('Na aba Animes do Descobrir, a busca também mostra os resultados do MyAnimeList. Ao abrir um deles, você vai para a página completa da obra (episódios, "Assistir" e "Talvez você goste").')}
+        {t('A busca do Descobrir usa o MyAnimeList para completar o que as suas fontes encontram: nota do MAL, capa e nomes alternativos (ex.: buscar "Attack on Titan" acha "Shingeki no Kyojin").')}
       </p>
 
       <div className="rounded-md bg-canvas border border-line-subtle p-3 space-y-2.5">

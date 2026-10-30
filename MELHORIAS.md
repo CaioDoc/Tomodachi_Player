@@ -572,3 +572,19 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
   - O Client ID fica guardado criptografado no computador (nunca no código).
   - Se o MAL recusar o Client ID, a busca continua pelo Jikan e avisa.
   - O app avisa se alguém colar o Client Secret por engano (ele não é usado para nada).
+
+## Modo anônimo, "Assistir" sempre no app e busca só nas suas fontes (1.6.7-beta)
+
+- **Modo anônimo** (botão ao lado de Doar, em Animes & Vídeos e em Mangás & Comics): enquanto ligado, o que você assiste/lê naquela seção não fica salvo (posição do vídeo, "Continuar", histórico, episódios/capítulos vistos e AniList). Vale até desligar ou fechar o app; o player e o leitor mostram o selo "Anônimo".
+- **"Assistir" nunca abre o site da fonte:**
+  - o app abre a página do episódio escondida, aperta play nos players (inclusive dentro de iframes) e captura o vídeo (m3u8/mp4) direto da rede, para tocar no player do app;
+  - se o site não entregar o vídeo, o player avisa e oferece "Tentar de novo" e "Procurar em outras fontes" (antes mostrava a página do site);
+  - saíram todos os botões "Assistir na web/Webview" (biblioteca, página da obra, cards do AniList, "Onde assistir");
+  - links de addons que apontam para páginas também tocam pelo player.
+- **Busca do Descobrir:**
+  - mostra só obras que as suas fontes (extensões, addons, plugins) têm;
+  - em uma lista única, ordenada pelo que mais bate com o texto (título exato, depois "começa com", depois "contém");
+  - o que não bate com a busca não aparece (ex.: "The Bad Guys: Breaking In" ao buscar "Breaking Bad");
+  - a mesma obra achada em várias fontes vira um card só, com "+N" para escolher a fonte;
+  - AniList e MyAnimeList completam capa, nota e nomes alternativos (buscar "Attack on Titan" acha "Shingeki no Kyojin");
+  - sem fontes instaladas, a busca avisa e leva para adicionar fontes; gêneros/tags sozinhos (ex.: tag clicada numa obra) continuam navegando pelo catálogo.

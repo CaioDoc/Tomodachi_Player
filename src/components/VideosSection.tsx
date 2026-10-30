@@ -10,7 +10,7 @@ import { MihonLibrary } from './MihonLibrary';
 import { DiscoverView } from './DiscoverView';
 import { SourcesManager } from './SourcesManager';
 import { ContinueWatching } from './ContinueWatching';
-import { KeepAliveViews, SectionTabBar, SectionAction, type SectionGroup, DonateAction } from './SectionChrome';
+import { KeepAliveViews, SectionTabBar, SectionAction, type SectionGroup, DonateAction, IncognitoAction } from './SectionChrome';
 import { openDonate } from '../constants/support';
 import { UpdatesView, HistoryView } from './ActivityViews';
 import { Compass, Library, FolderOpen, RefreshCw, History, ArchiveRestore, Clapperboard, Puzzle } from 'lucide-react';
@@ -134,6 +134,7 @@ export const VideosSection: React.FC<VideosSectionProps> = ({ onOpenTab, view, o
       <>
         <SectionAction icon={<History size={14} />} label={t('Histórico')} active={view === 'history'} onClick={() => onChangeView(view === 'history' ? 'library' : 'history')} />
         <SectionAction icon={<ArchiveRestore size={14} />} label={t('Backup')} active={!!backupMode} onClick={() => setBackupMode('menu')} />
+        <IncognitoAction source="video" />
         <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
         <SectionAction
           primary
@@ -148,7 +149,10 @@ export const VideosSection: React.FC<VideosSectionProps> = ({ onOpenTab, view, o
         />
       </>
     ) : (
-      <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
+      <>
+        <IncognitoAction source="video" />
+        <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
+      </>
     );
 
   return (

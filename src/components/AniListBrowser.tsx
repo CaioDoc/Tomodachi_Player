@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import type { TabType } from '../types';
 import type { LibraryItem } from './MihonLibrary';
-import { buildAnimeWatchWebUrl } from '../api/extensionRegistry';
 import { FavoriteTagModal } from './FavoriteTagModal';
 import { anilistTagNames, parseAniListQuery } from '../api/anilistTags';
 import { useBulkSelection, BulkFavoriteBar, heartButtonClass, heartSelectTitle } from './BulkFavorite';
@@ -486,15 +485,6 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
     });
   };
 
-  const handleWatchInWebview = (animeTitle: string, epNum: number = 1) => {
-    const fullTitle = `${animeTitle}${epNum > 1 ? ` - Ep. ${epNum}` : ''}`;
-    const url = buildAnimeWatchWebUrl(animeTitle, epNum, 'AniList');
-    onOpenTab?.('webview', t('Assistir: {title}', { title: fullTitle }), {
-      url,
-      initialUrl: url,
-    });
-  };
-
   const handleWatchEpisode = (
     media: AniListMedia,
     epNum: number,
@@ -591,9 +581,8 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
           <button
             type="button"
             onClick={() => {
-              const url = debouncedSearch
-                ? buildAnimeWatchWebUrl(debouncedSearch, 1)
-                : 'https://anilist.co';
+              // Só o site do AniList (informações); assistir é sempre pelo player do app
+              const url = debouncedSearch ? `https://anilist.co/search/anime?search=${encodeURIComponent(debouncedSearch)}` : 'https://anilist.co';
               onOpenTab?.('webview', 'Webview AniList', { url, initialUrl: url });
             }}
             className="h-9 px-3 rounded-lg bg-subtle hover:bg-elevated border border-line text-fg-2 hover:text-fg text-[12px] font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
@@ -870,19 +859,6 @@ export const AniListBrowser: React.FC<AniListBrowserProps> = ({ onOpenTab, exter
                         }
                       >
                         <Heart size={12} fill={isFavorited || isMarked ? 'currentColor' : 'none'} />
-                      </button>
-
-                      {/* Botão de Webview no card */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleWatchInWebview(displayTitle, 1);
-                        }}
-                        className="absolute bottom-1.5 right-1.5 p-1.5 rounded-full bg-black/70 hover:bg-accent text-fg-muted hover:text-black transition-all shadow-md z-10 opacity-0 group-hover:opacity-100"
-                        title={t('Assistir na Webview')}
-                      >
-                        <Globe size={12} />
                       </button>
 
                       {/* Tag Badge se já for favoritado */}

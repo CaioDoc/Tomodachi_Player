@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Heart } from 'lucide-react';
+import { ArrowLeft, Heart, VenetianMask } from 'lucide-react';
+import { useIncognito } from '../utils/incognito';
+import type { ProgressSource } from '../utils/progress';
+import { toast } from './Feedback';
 import { t } from '../i18n';
 
 /** Chip de seleção (fontes do catálogo, filtros etc.) */
@@ -203,3 +206,32 @@ export const DonateAction: React.FC<{ onClick: () => void; label: string; title?
     <span className="hidden sm:inline">{label}</span>
   </button>
 );
+
+/** Modo anônimo da seção: enquanto ligado, o que é assistido/lido não fica salvo */
+export const IncognitoAction: React.FC<{ source: ProgressSource }> = ({ source }) => {
+  const [on, setOn] = useIncognito(source);
+  const what = source === 'video' ? t('o que você assistir') : t('o que você ler');
+  const toggle = () => {
+    setOn(!on);
+    if (!on) toast.info(t('Modo anônimo ligado'), t('Até você desligar ou fechar o app, {what} não fica salvo: sem histórico, "Continuar", progresso nem AniList.', { what }));
+    else toast.info(t('Modo anônimo desligado'), t('O progresso volta a ser salvo normalmente.'));
+  };
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={toggle}
+      title={on ? t('Modo anônimo ligado: nada do que você assistir ou ler fica salvo. Clique para desligar.') : t('Modo anônimo: assistir e ler sem salvar histórico nem progresso')}
+      className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+        on ? 'bg-violet-500/20 border-violet-400/50 text-violet-200 hover:bg-violet-500/30' : 'bg-subtle hover:bg-elevated border-line-subtle text-fg-muted hover:text-fg'
+      }`}
+    >
+      <VenetianMask size={15} />
+      <span className="hidden sm:inline">{t('Anônimo')}</span>
+      <span className={`relative w-7 h-4 rounded-full transition-colors ${on ? 'bg-violet-400' : 'bg-elevated border border-line'}`} aria-hidden>
+        <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${on ? 'left-[13px]' : 'left-0.5'}`} />
+      </span>
+    </button>
+  );
+};

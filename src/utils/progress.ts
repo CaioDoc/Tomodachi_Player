@@ -3,6 +3,8 @@
 // Formato salvo em localStorage (mantido compatível com versões anteriores):
 //   manga_progress / video_progress = { [chapterUrl]: { read, bookmark, lastPageRead, lastSecondSeen, updatedAt } }
 
+import { isIncognito } from './incognito';
+
 export type ProgressSource = 'manga' | 'video';
 
 export interface ChapterProgress {
@@ -46,10 +48,12 @@ export function getChapterProgress(source: ProgressSource, url: string): Chapter
 export function updateChapterProgress(
   source: ProgressSource,
   updates: Record<string, Partial<ChapterProgress>>,
-  opts: { silent?: boolean } = {}
+  /** auto: gravado sozinho pelo player/leitor (não acontece no modo anônimo) */
+  opts: { silent?: boolean; auto?: boolean } = {}
 ): void {
   const urls = Object.keys(updates).filter(Boolean);
   if (urls.length === 0) return;
+  if (opts.auto && isIncognito(source)) return;
   try {
     const map = getProgressMap(source);
     const now = Date.now();
@@ -146,7 +150,7 @@ export function getVideoPositionInfo(path: string): { t: number; d: number } | n
 }
 
 export function saveVideoPosition(path: string, seconds: number, duration: number): void {
-  if (!path || !isFinite(seconds)) return;
+  if (!path || !isFinite(seconds) || isIncognito('video')) return;
   try {
     const map = JSON.parse(localStorage.getItem(VIDEO_POS_KEY) || '{}') || {};
     // Perto do fim: considera concluído e limpa a posição

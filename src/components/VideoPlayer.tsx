@@ -30,7 +30,8 @@ import { useIsTabActive, isTypingTarget } from '../context/TabContext';
 import { getVideoPosition, saveVideoPosition, updateChapterProgress } from '../utils/progress';
 import { recordResume } from '../utils/continueWatching';
 import { parseSubtitles, decodeSubtitleBytes, siblingSubtitleCandidates, type SubtitleCue } from '../utils/subtitles';
-import { Captions, CaptionsOff, SkipForward, AudioLines, ChevronRight, Radio } from 'lucide-react';
+import { Captions, CaptionsOff, SkipForward, AudioLines, ChevronRight, Radio, AlertTriangle, VenetianMask } from 'lucide-react';
+import { useIncognito } from '../utils/incognito';
 import { openWatchSources } from '../api/watchSources';
 import { t, tMaybe } from '../i18n';
 
@@ -317,6 +318,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Extração automática de stream e reprodutor embutido
   const [isExtracting, setIsExtracting] = useState(false);
+  const [incognito] = useIncognito('video');
+  // O site não entregou o vídeo: avisa no player (nunca abre a página do site)
+  const [extractFailed, setExtractFailed] = useState<string | null>(null);
+  const [extractTry, setExtractTry] = useState(0);
   const [extractedMedia, setExtractedMedia] = useState<{
     type: 'embed' | 'stream';
     url: string;
@@ -468,60 +473,44 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setTranscodedUrl(null);
     setExtractedMedia(null);
 
-    if (isWebUrl && !youtubeTrailerId) {
-      if (window.electronAPI?.extractVideoStream) {
-        setIsExtracting(true);
-        window.electronAPI
-          .extractVideoStream(activeVideoPath)
-          .then(async (res) => {
-            const extractedUrl = res?.url || res?.streamUrl || res?.embedUrl;
-            if (res?.success && extractedUrl) {
-              if (res.type === 'stream' && window.electronAPI?.getStreamUrl) {
-                try {
-                  const transcoded = await window.electronAPI.getStreamUrl({
-                    filePath: extractedUrl,
-                    referer: res.referer || activeVideoPath,
-                  });
-                  if (transcoded) {
-                    setTranscodedUrl(transcoded);
-                  }
-                } catch (e) {
-                  console.warn('Erro ao conectar ao servidor de streaming:', e);
-                }
-              }
+    setExtractFailed(null);
 
-              setExtractedMedia({
-                type: res.type || 'embed',
-                url: extractedUrl,
-                referer: res.referer || activeVideoPath,
-                servers: res.servers,
-              });
-            } else {
-              setExtractedMedia({
-                type: 'embed',
-                url: activeVideoPath,
-                referer: activeVideoPath,
-              });
-            }
-          })
-          .catch((err) => {
-            console.warn('Erro ao extrair vídeo da web:', err);
-            setExtractedMedia({
-              type: 'embed',
-              url: activeVideoPath,
-              referer: activeVideoPath,
-            });
-          })
-          .finally(() => {
-            setIsExtracting(false);
-          });
-      } else {
-        setExtractedMedia({
-          type: 'embed',
-          url: activeVideoPath,
-          referer: activeVideoPath,
-        });
+    if (isWebUrl && !youtubeTrailerId) {
+      if (!window.electronAPI?.extractVideoStream) {
+        setExtractFailed(t('Disponível só no app instalado'));
+        return;
       }
+      let alive = true;
+      setIsExtracting(true);
+      window.electronAPI
+        .extractVideoStream(activeVideoPath)
+        .then(async (res) => {
+          if (!alive) return;
+          const extractedUrl = res?.streamUrl || res?.url;
+          if (!res?.success || !extractedUrl || res.type === 'embed') {
+            setExtractFailed(tMaybe(res?.error) || t('O site não entregou o vídeo'));
+            return;
+          }
+          if (window.electronAPI?.getStreamUrl) {
+            try {
+              const transcoded = await window.electronAPI.getStreamUrl({ filePath: extractedUrl, referer: res.referer || activeVideoPath });
+              if (alive && transcoded) setTranscodedUrl(transcoded);
+            } catch (e) {
+              console.warn('Erro ao conectar ao servidor de streaming:', e);
+            }
+          }
+          if (!alive) return;
+          setExtractedMedia({ type: 'stream', url: extractedUrl, referer: res.referer || activeVideoPath, servers: res.servers });
+        })
+        .catch((err) => {
+          if (alive) setExtractFailed(tMaybe(String(err?.message || err)) || t('O site não entregou o vídeo'));
+        })
+        .finally(() => {
+          if (alive) setIsExtracting(false);
+        });
+      return () => {
+        alive = false;
+      };
     } else if (directStream && /^https?:\/\//i.test(activeVideoPath) && /m3u8/i.test(activeVideoPath) && window.electronAPI?.getStreamUrl) {
       // HLS não toca direto no Chromium: converte já de início (com busca pelo ?ss=)
       let alive = true;
@@ -536,7 +525,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVideoPath, isWebUrl, youtubeTrailerId]);
+  }, [activeVideoPath, isWebUrl, youtubeTrailerId, extractTry]);
 
   // Legendas enviadas pela fonte (plugins): carrega a do idioma preferido
   useEffect(() => {
@@ -781,7 +770,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     // Marca o episódio como visto ao passar de 90%
     if (currentEpisodeUrl && !markedSeenRef.current && dur > 0 && pos / dur > 0.9) {
       markedSeenRef.current = true;
-      updateChapterProgress('video', { [currentEpisodeUrl]: { read: true } });
+      updateChapterProgress('video', { [currentEpisodeUrl]: { read: true } }, { auto: true });
     }
   };
 
@@ -1082,14 +1071,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
-  const handleOpenWebview = () => {
-    const target = activeVideoPath;
-    if (onOpenTab) {
-      onOpenTab('webview', actualTitle, {
-        url: target,
-        initialUrl: target,
-      });
+  /** Procura este episódio em outros sites, plugins e addons */
+  const openOtherSources = () => {
+    const ctxEp = orderedEpisodes.find((e) => e.url === currentEpisodeUrl);
+    const n = Number(ctxEp?.number) || Number((actualTitle.match(/(?:Epis[oó]dio|\bE)\s*(\d{1,4})\b/i) || [])[1]) || 1;
+    const workTitle = work?.title || episodeContext?.workTitle || actualTitle.split(' - ')[0];
+    if (String(work?.url || '').startsWith('nuvio:')) {
+      onOpenTab?.('anime-detail', workTitle, { anime: { url: work!.url, title: workTitle, cover: work?.cover }, focusEpisode: currentEpisodeUrl });
+      return;
     }
+    openWatchSources({
+      title: workTitle,
+      kind: stremioRef?.type === 'movie' ? 'movie' : 'series',
+      episode: n,
+      cover: work?.cover,
+      episodeUrl: currentEpisodeUrl,
+      workUrl: work?.url,
+      episodeUrls: orderedEpisodes.length ? Object.fromEntries(orderedEpisodes.filter((e) => e.number != null).map((e) => [String(e.number), e.url])) : undefined,
+    });
   };
 
   const formatTime = (seconds: number) => {
@@ -1128,6 +1127,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <div className="flex items-center gap-2 truncate max-w-lg">
           <Film size={16} className="text-purple-400 flex-shrink-0" />
           <span className="font-semibold text-fg truncate">{actualTitle}</span>
+          {incognito && (
+            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-500/20 border border-violet-400/40 text-violet-200 text-[10.5px] font-semibold" title={t('Modo anônimo: nada deste {what} fica salvo', { what: t('vídeo') })}>
+              <VenetianMask size={11} /> {t('Anônimo')}
+            </span>
+          )}
           {frameSavedNotice && (
             <span className="flex items-center gap-1 text-[11px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded">
               <Check size={12} /> {t('Capa Salva!')}
@@ -1151,24 +1155,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           {!isLocalFile && !!currentEpisodeUrl && !youtubeTrailerId && (
             <button
               type="button"
-              onClick={() => {
-                const ctxEp = orderedEpisodes.find((e) => e.url === currentEpisodeUrl);
-                const n = Number(ctxEp?.number) || Number((actualTitle.match(/(?:Epis[oó]dio|\bE)\s*(\d{1,4})\b/i) || [])[1]) || 1;
-                const workTitle = work?.title || episodeContext?.workTitle || actualTitle.split(' - ')[0];
-                if (String(work?.url || '').startsWith('nuvio:')) {
-                  onOpenTab?.('anime-detail', workTitle, { anime: { url: work!.url, title: workTitle, cover: work?.cover }, focusEpisode: currentEpisodeUrl });
-                  return;
-                }
-                openWatchSources({
-                  title: workTitle,
-                  kind: stremioRef?.type === 'movie' ? 'movie' : 'series',
-                  episode: n,
-                  cover: work?.cover,
-                  episodeUrl: currentEpisodeUrl,
-                  workUrl: work?.url,
-                  episodeUrls: orderedEpisodes.length ? Object.fromEntries(orderedEpisodes.filter((e) => e.number != null).map((e) => [String(e.number), e.url])) : undefined,
-                });
-              }}
+              onClick={openOtherSources}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-subtle hover:bg-elevated text-fg-2 hover:text-white rounded border border-line transition-colors cursor-pointer"
               title={t('Trocar de fonte: procurar este episódio em outros sites, plugins e addons')}
             >
@@ -1277,40 +1264,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </div>
             </div>
           </div>
-        ) : extractedMedia?.type === 'embed' ? (
-          <div className="flex-1 w-full h-full relative bg-black flex flex-col">
-            {extractedMedia.servers && extractedMedia.servers.length > 1 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border-b border-line overflow-x-auto shrink-0 text-xs z-10">
-                <span className="text-fg-muted font-semibold mr-1 flex items-center gap-1">
-                  <Play size={11} className="text-accent fill-current" /> {t('Servidores:')}
-                </span>
-                {extractedMedia.servers.map((srv, idx) => {
-                  const isActive = extractedMedia.url === srv.url;
-                  return (
-                    <button
-                      key={srv.url + idx}
-                      type="button"
-                      onClick={() => setExtractedMedia({ ...extractedMedia, url: srv.url })}
-                      className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer shrink-0 border ${
-                        isActive
-                          ? 'bg-success text-white border-success shadow-sm'
-                          : 'bg-subtle text-fg-2 hover:text-white border-line hover:bg-elevated'
-                      }`}
-                    >
-                      {srv.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <iframe
-              key={extractedMedia.url}
-              src={extractedMedia.url}
-              title={actualTitle}
-              className="w-full h-full border-0 flex-1"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-              allowFullScreen
-            />
+        ) : extractFailed ? (
+          <div className="flex-1 flex flex-col items-center justify-center bg-canvas p-8 gap-3 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-subtle border border-line flex items-center justify-center text-fg-muted">
+              <AlertTriangle size={24} />
+            </div>
+            <h3 className="text-[15px] font-semibold text-fg">{t('Não deu para tocar este episódio por esta fonte')}</h3>
+            <p className="text-[12.5px] text-fg-muted max-w-md leading-relaxed">
+              {t('O site não entregou o vídeo para o player do app. Tente de novo ou escolha outra fonte: o vídeo sempre toca aqui dentro.')}
+            </p>
+            {extractFailed !== t('O site não entregou o vídeo') && <p className="text-[11px] text-fg-muted/80 max-w-md">{extractFailed}</p>}
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setExtractTry((n) => n + 1)}
+                className="h-9 px-4 rounded-md bg-subtle hover:bg-elevated border border-line text-[12.5px] text-fg inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw size={14} /> {t('Tentar de novo')}
+              </button>
+              {!!currentEpisodeUrl && (
+                <button
+                  type="button"
+                  onClick={openOtherSources}
+                  className="h-9 px-4 rounded-md bg-accent hover:bg-accent-hover text-accent-fg text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Radio size={14} /> {t('Procurar em outras fontes')}
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           /* Video Element Nativo / Stream direto / Transcode FFmpeg */
@@ -1318,7 +1299,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <video
               key={src}
               ref={videoRef}
-              src={src}
+              src={src || undefined}
               controls={false}
               autoPlay={isTabActive}
               preload="metadata"
@@ -1471,7 +1452,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </div>
 
       {/* Video Controls Bar para mídia nativa */}
-      {!youtubeTrailerId && !isExtracting && extractedMedia?.type !== 'embed' && (
+      {!youtubeTrailerId && !isExtracting && !extractFailed && (
         <div className="px-4 py-2.5 bg-surface border-t border-line flex flex-col gap-2">
           {/* Progress Bar / Scrubber */}
           <div className="flex items-center gap-3">

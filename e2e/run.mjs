@@ -73,6 +73,20 @@ async function goSection(label) {
   });
   await sleep(600);
 }
+/** Títulos dos cards da busca, na ordem em que aparecem */
+async function resultTitles() {
+  return page.$$eval('section[aria-label="Resultados nas suas fontes"] div.group > button:first-child', (els) => els.map((e) => e.getAttribute('title') || ''));
+}
+async function waitSearchDone() {
+  await page
+    .waitForFunction(() => {
+      const sec = document.querySelector('section[aria-label="Resultados nas suas fontes"]');
+      const empty = /Nada encontrado|ainda não tem fontes/.test(document.body.innerText);
+      return empty || (sec && !/buscando em/i.test(sec.textContent || ''));
+    }, null, { timeout: 60000 })
+    .catch(() => {});
+  await sleep(1200);
+}
 async function goTab(label) {
   await visible(page, `[role=tab]:has-text("${label}")`).first().click();
   await sleep(700);
@@ -114,19 +128,19 @@ await step('Descobrir · Filmes (Cinemeta)', async () => {
   return `${await cards.count()} filmes carregados`;
 });
 
-await step('Busca no Descobrir', async () => {
+await step('Busca sem fontes instaladas pede para adicionar fontes', async () => {
   await goTab('Séries');
   const input = visible(page, 'input[placeholder*="Buscar"]').first();
   await input.fill('Breaking Bad');
   await input.press('Enter');
-  await sleep(4000);
-  await shot(page, 'busca-series');
-  const n = await visible(page, 'button[aria-label^="Marcar para favoritar"]').count();
-  if (!n) throw new Error('busca não trouxe resultados');
+  await page.locator('text=Você ainda não tem fontes para buscar >> visible=true').first().waitFor({ timeout: 20000 });
+  await shot(page, 'busca-sem-fontes');
+  const extra = await visible(page, 'button[aria-label^="Marcar para favoritar"]').count();
   await input.fill('');
   await input.press('Enter');
   await sleep(2500);
-  return `${n} resultados para "Breaking Bad"`;
+  if (extra) throw new Error(`a busca mostrou ${extra} obras que não estão em nenhuma fonte`);
+  return 'aviso único, nenhuma obra de fora das fontes';
 });
 
 await step('Página da obra (série)', async () => {
@@ -162,18 +176,19 @@ await step('Tags clicáveis (série → Descobrir)', async () => {
   return `tag "${name}" abriu o Descobrir buscando por ela`;
 });
 
-await step('Busca por tags no Descobrir (Seinen, Monster)', async () => {
+await step('Navegar por tag no Descobrir (Seinen)', async () => {
   await visible(page, '[aria-label="Catálogos"] [role=tab]:has-text("Animes")').first().click();
   await sleep(800);
   const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
-  await input.fill('Seinen, Monster');
+  await input.fill('Seinen');
   await sleep(5000);
-  await shot(page, 'busca-tags-anime');
+  await shot(page, 'navegar-tag-anime');
   const row = await page.locator('[aria-label="Filtros da busca"] >> visible=true').first().innerText();
   const n = await visible(page, 'button[title^="Marcar para favoritar"]').count();
   await input.fill('');
   await sleep(2500);
   if (!/Tag\s*Seinen/i.test(row.replace(/\s+/g, ' '))) throw new Error('não reconheceu a tag: ' + row);
+  if (!n) throw new Error('nenhuma obra com a tag');
   return `${row.replace(/\s+/g, ' ')} → ${n} animes`;
 });
 
@@ -263,14 +278,16 @@ await step('Descobrir · busca também nas fontes instaladas', async () => {
   await input.fill('Cowboy Bebop');
   const sec = page.locator('section[aria-label="Resultados nas suas fontes"] >> visible=true').first();
   await sec.waitFor({ timeout: 20000 });
-  await page.waitForFunction(() => !/buscando em/i.test(document.querySelector('section[aria-label="Resultados nas suas fontes"]')?.textContent || 'buscando em'), null, { timeout: 45000 }).catch(() => {});
-  await sleep(1500);
+  await waitSearchDone();
   await shot(page, 'busca-nas-fontes');
   const txt = (await sec.innerText()).replace(/\s+/g, ' ').slice(0, 160);
+  const titles = await resultTitles();
   await input.fill('');
   await sleep(800);
   if (!/Anime Kitsu/.test(txt)) throw new Error('o addon não apareceu na busca: ' + txt);
-  return txt;
+  if (!/^Cowboy Bebop$/i.test(titles[0] || '')) throw new Error('o 1º resultado não é a obra buscada: ' + titles.slice(0, 4).join(' | '));
+  if (titles.some((x) => !/cowboy\s*bebop/i.test(x))) throw new Error('resultado que não bate com a busca: ' + titles.filter((x) => !/cowboy/i.test(x)).join(' | '));
+  return `${titles.length} obras: ${titles.slice(0, 4).join(' | ')}`;
 });
 
 await step('Doar presente na Biblioteca de Mangás', async () => {
@@ -306,14 +323,15 @@ await step('Fontes · addon só de links (Torrentio) entra na busca', async () =
   await input.fill('Breaking Bad');
   const row = page.locator('section[aria-label="Resultados nas suas fontes"] >> text=Torrentio').first();
   await row.waitFor({ timeout: 45000 });
-  await page.waitForFunction(() => !/buscando em/i.test(document.querySelector('section[aria-label="Resultados nas suas fontes"]')?.textContent || ''), null, { timeout: 45000 }).catch(() => {});
-  await sleep(1200);
+  await waitSearchDone();
   await shot(page, 'busca-torrentio');
-  const txt = (await page.locator('section[aria-label="Resultados nas suas fontes"] >> visible=true').first().innerText()).replace(/\s+/g, ' ').slice(0, 160);
+  const titles = await resultTitles();
   await input.fill('');
   await sleep(800);
-  if (!/Breaking Bad/i.test(txt)) throw new Error('Torrentio apareceu sem a obra: ' + txt);
-  return txt;
+  if (titles[0] !== 'Breaking Bad') throw new Error('o 1º resultado não é "Breaking Bad": ' + titles.slice(0, 4).join(' | '));
+  const junk = titles.filter((x) => /bad guys|hockey|bad news bears/i.test(x));
+  if (junk.length) throw new Error('resultados que não batem com a busca: ' + junk.join(' | '));
+  return `${titles.length} obras, na ordem: ${titles.slice(0, 5).join(' | ')}`;
 });
 
 await step('Descobrir · nada encontrado mostra um aviso só', async () => {
@@ -337,33 +355,47 @@ await step('MyAnimeList · resposta da busca (sem chave)', async () => {
   return info;
 });
 
-await step('Descobrir · resultados do MyAnimeList (sem chave)', async () => {
+await step('Descobrir · relevância e nota do MyAnimeList', async () => {
   await goSection('Animes & Vídeos');
   await goTab('Descobrir');
   await visible(page, '[aria-label="Catálogos"] [role=tab]:has-text("Animes")').first().click();
   await sleep(500);
   const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
   await input.fill('Fullmetal Alchemist');
-  const card = page.locator('section[aria-label="Resultados nas suas fontes"] div:has(> div > span:text-is("MyAnimeList")) button[title] >> visible=true').first();
-  await card.waitFor({ timeout: 45000 });
-  await sleep(1200);
-  await shot(page, 'busca-myanimelist');
-  const row = (await page.locator('section[aria-label="Resultados nas suas fontes"] div:has(> div > span:text-is("MyAnimeList")) >> visible=true').first().innerText()).replace(/\s+/g, ' ').slice(0, 140);
+  await page.locator('section[aria-label="Resultados nas suas fontes"] >> visible=true').first().waitFor({ timeout: 45000 });
+  await waitSearchDone();
+  await sleep(2500);
+  await shot(page, 'busca-relevancia-mal');
+  const titles = await resultTitles();
+  const malBadges = await page.locator('section[aria-label="Resultados nas suas fontes"] span:has-text("MAL") >> visible=true').count();
   const before = await page.locator('[draggable=true]').count();
-  await card.click();
+  await page.locator('section[aria-label="Resultados nas suas fontes"] div.group > button:first-child >> visible=true').first().click();
   await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, before, { timeout: 30000 });
   await sleep(3000);
-  await shot(page, 'obra-do-myanimelist');
-  const opened = await page.locator('text=/Episódios|Onde assistir|myanimelist/i >> visible=true').count();
+  await shot(page, 'obra-da-busca');
+  const opened = await page.locator('text=/Episódios|Onde assistir|Temporada/i >> visible=true').count();
   await page.keyboard.press('Control+w').catch(() => {});
   await sleep(600);
   await goSection('Animes & Vídeos');
   await goTab('Descobrir');
   await page.locator('input[placeholder*="ex."] >> visible=true').first().fill('');
   await sleep(800);
-  if (!/Fullmetal/i.test(row)) throw new Error('MyAnimeList sem a obra: ' + row);
-  if (!opened) throw new Error('a obra do MyAnimeList não abriu');
-  return row;
+  if (!/^Fullmetal Alchemist/i.test(titles[0] || '')) throw new Error('o 1º resultado não é a obra buscada: ' + titles.slice(0, 4).join(' | '));
+  if (titles.some((x) => /full metal panic/i.test(x))) throw new Error('"Full Metal Panic" apareceu na busca por Fullmetal Alchemist');
+  if (!malBadges) throw new Error('sem nota do MyAnimeList nos cards');
+  if (!opened) throw new Error('a obra não abriu');
+  return `${titles.length} obras (${malBadges} com nota do MAL): ${titles.slice(0, 4).join(' | ')}`;
+});
+
+await step('Assistir · nunca mostra o site: acha o vídeo ou avisa', async () => {
+  const none = await page.evaluate(() => window.electronAPI.extractVideoStream('https://example.com/'));
+  const mp4 = await page.evaluate(() => window.electronAPI.extractVideoStream('https://www.w3schools.com/html/html5_video.asp'));
+  const hls = await page.evaluate(() => window.electronAPI.extractVideoStream('https://hlsjs.video-dev.org/demo/'));
+  const info = `sem vídeo → ${none?.success ? 'achou ' + none.url : 'avisa (' + none?.error + ')'}; mp4 → ${mp4?.success ? mp4.url : 'falhou ' + mp4?.error}; hls → ${hls?.success ? hls.url : 'falhou ' + hls?.error}`;
+  if (none?.success || none?.type === 'embed') throw new Error('devolveu a página em vez de avisar: ' + info);
+  if (!mp4?.success || mp4.type !== 'stream') throw new Error(info);
+  if (!hls?.success || hls.type !== 'stream') throw new Error(info);
+  return info.slice(0, 300);
 });
 
 await step('Configurações · cartão do MyAnimeList', async () => {
@@ -426,6 +458,22 @@ await step('Mangás · Talvez você goste (MangaDex)', async () => {
   return `${await page.locator('section[aria-label="Talvez você goste"] button.group >> visible=true').count()} sugestões`;
 });
 
+await step('Modo anônimo · ligar (Animes & Vídeos e Mangás)', async () => {
+  await goSection('Mangás & Comics');
+  const inManga = await page.locator('[role=switch]:has-text("Anônimo") >> visible=true').count();
+  await goSection('Animes & Vídeos');
+  const sw = page.locator('[role=switch]:has-text("Anônimo") >> visible=true').first();
+  await sw.click();
+  await sleep(500);
+  const on = await sw.getAttribute('aria-checked');
+  await shot(page, 'modo-anonimo');
+  if (!inManga) throw new Error('sem o botão em Mangás & Comics');
+  if (on !== 'true') throw new Error('não ligou');
+  globalThis.__posBefore = await page.evaluate(() => localStorage.getItem('tp_video_positions') || '{}');
+  globalThis.__contBefore = await page.evaluate(() => localStorage.getItem('tp_continue_watching') || '[]');
+  return 'ligado (aparece nas duas seções)';
+});
+
 await step('Vídeo local · adicionar pasta e tocar', async () => {
   if (!MEDIA) throw new Error('sem pasta de mídia');
   await app.evaluate(({ dialog }, dir) => {
@@ -448,6 +496,23 @@ await step('Vídeo local · adicionar pasta e tocar', async () => {
   await shot(page, 'video-local-tocando');
   if (!t || t.err) throw new Error('vídeo não tocou: ' + JSON.stringify(t));
   return `tocando: ${t.t.toFixed(1)}s de ${Number(t.d).toFixed(1)}s (pausado=${t.paused})`;
+});
+
+await step('Modo anônimo · nada do que foi assistido ficou salvo', async () => {
+  await sleep(2500);
+  const badge = await page.locator('text=Anônimo >> visible=true').count();
+  // Fecha o player (é aí que a posição costuma ser gravada)
+  await page.keyboard.press('Control+w').catch(() => {});
+  await sleep(1500);
+  const pos = await page.evaluate(() => localStorage.getItem('tp_video_positions') || '{}');
+  const cont = await page.evaluate(() => localStorage.getItem('tp_continue_watching') || '[]');
+  await goSection('Animes & Vídeos');
+  const sw = page.locator('[role=switch]:has-text("Anônimo") >> visible=true').first();
+  if ((await sw.getAttribute('aria-checked')) === 'true') await sw.click();
+  await sleep(500);
+  if (pos !== globalThis.__posBefore) throw new Error('a posição do vídeo foi salva no modo anônimo');
+  if (cont !== globalThis.__contBefore) throw new Error('entrou no "Continuar assistindo" no modo anônimo');
+  return `nada salvo (selo no player: ${badge ? 'sim' : 'não'}); modo desligado de novo`;
 });
 
 await step('Navegador integrado', async () => {

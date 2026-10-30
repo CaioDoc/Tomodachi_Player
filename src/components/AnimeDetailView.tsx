@@ -5,7 +5,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Play,
-  Globe,
   Heart,
   CheckCircle2,
   Circle,
@@ -24,7 +23,6 @@ import { readLibrary, updateLibrary } from '../utils/libraryStore';
 import { PROGRESS_EVENT, mergeChapterProgress, updateChapterProgress, getVideoPositionInfo } from '../utils/progress';
 import { openVideoEpisode, chapterDisplayName } from '../api/openChapter';
 import { openWatchSources } from '../api/watchSources';
-import { buildAnimeWatchWebUrl } from '../api/extensionRegistry';
 import { fetchChapterList } from '../api/chapterList';
 import { getResume, CONTINUE_EVENT } from '../utils/continueWatching';
 import { Loader2 } from 'lucide-react';
@@ -200,11 +198,6 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
     const r = isLocalPath(ep.url || '') ? null : getResume(ep.url);
     if (r?.play) onOpenTab?.('video-player', r.title, r.play);
     else play(ep);
-  };
-  const playWeb = (ep?: LibraryChapter | null) => {
-    const n = ep?.number || 1;
-    const url = buildAnimeWatchWebUrl(anime.title, n, anime.sourceName);
-    onOpenTab?.('webview', t('Assistir: {title} Ep {n}', { title: anime.title, n }), { url, initialUrl: url });
   };
 
   const nextPos = next ? getVideoPositionInfo(next.url) : null;
@@ -391,11 +384,6 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
                 </button>
               </div>
             )}
-            <div className="mt-3">
-              <button type="button" onClick={() => playWeb(null)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-subtle hover:bg-elevated text-fg text-xs cursor-pointer">
-                <Globe size={13} /> {t('Procurar na web')}
-              </button>
-            </div>
           </div>
         ) : visible.length === 0 ? (
           <div className="p-8 text-center text-sm text-fg-muted">{t('Nenhum episódio corresponde à busca.')}</div>
@@ -448,19 +436,6 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
                     ) : null}
                   </div>
 
-                  {!isLocalPath(ep.url) && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        playWeb(ep);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 p-1.5 rounded-md text-fg-muted hover:text-accent hover:bg-elevated cursor-pointer"
-                      title={t('Assistir este episódio na web')}
-                    >
-                      <Globe size={14} />
-                    </button>
-                  )}
                   <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-subtle group-hover:bg-accent group-hover:text-accent-fg text-[11px] font-semibold transition-colors">
                     <Play size={11} fill="currentColor" /> {pos?.t ? t('Continuar') : t('Assistir')}
                   </span>

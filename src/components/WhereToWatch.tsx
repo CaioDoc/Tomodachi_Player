@@ -19,7 +19,7 @@ import {
   type ExtensionEpisode,
 } from '../api/watchSources';
 import { nuvioMeta, runNuvioScrapers, playNuvioStream, getNuvioState, nuvioWorkUrl, addonsFor, activeScrapers, kitsuOnlyStreamAddons, type NuvioMeta, type NuvioMetaPreview, type ScraperRun } from '../api/nuvio';
-import { buildAnimeWatchWebUrl, type InstalledExtension } from '../api/extensionRegistry';
+import { type InstalledExtension } from '../api/extensionRegistry';
 import { StreamRunList } from './StreamRunList';
 import { t, tn } from '../i18n';
 
@@ -684,19 +684,6 @@ export const WhereToWatch: React.FC<{ req: WatchRequest; episode: number; onOpen
           </button>
         </div>
       </form>
-      <div className="mx-4 mt-2">
-        <button
-          type="button"
-          onClick={() => {
-            const url = buildAnimeWatchWebUrl(override || req.title, episode);
-            onOpenTab?.('webview', t('Assistir: {title} Ep {n}', { title: override || req.title, n: episode }), { url, initialUrl: url });
-            onPlayed?.();
-          }}
-          className="text-[11.5px] text-fg-muted hover:text-accent inline-flex items-center gap-1 cursor-pointer"
-        >
-          <Globe size={12} /> {t('Procurar na web (navegador do app)')}
-        </button>
-      </div>
     </div>
   );
 };

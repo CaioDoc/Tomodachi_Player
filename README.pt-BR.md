@@ -75,7 +75,10 @@ Os executáveis são gerados automaticamente pelo GitHub Actions direto do códi
 - Favoritar várias obras de uma vez: toque no coração de cada capa e clique em **Favoritar** na barra que aparece.
 - Navegador integrado com bloqueador de anúncios.
 - Sincronização com o AniList.
-- **MyAnimeList na busca:** a aba Animes do Descobrir também mostra os resultados do MyAnimeList, sem precisar de chave (dá para usar a API oficial com o seu Client ID em Configurações → Contas).
+- **Modo anônimo:** assista e leia sem salvar histórico nem progresso (botão ao lado de Doar).
+- **Tudo toca dentro do app:** o player acha o vídeo da página do episódio sozinho; se uma fonte falhar, ele oferece outras.
+- **Busca nas suas fontes:** só aparece o que as suas extensões, addons e plugins têm, do resultado mais parecido para o menos.
+- **MyAnimeList na busca:** completa os resultados com a nota e os nomes do MyAnimeList, sem precisar de chave (dá para usar a API oficial com o seu Client ID em Configurações → Contas).
 - **Busca inteligente:** combine palavras e tags com vírgula (ex.: `Seinen, Monster`). Funciona na biblioteca e no Descobrir, onde gêneros e tags do AniList viram filtros.
 - **Talvez você goste:** a página de cada obra mostra continuações, histórias anteriores, spin-offs e obras parecidas, e as tags dela são clicáveis para achar mais do mesmo estilo.
 - Importar e exportar backups compatíveis com o Mihon e o Aniyomi (`.tachibk`), para trazer a biblioteca do celular.

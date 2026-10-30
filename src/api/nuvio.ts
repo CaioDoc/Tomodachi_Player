@@ -706,9 +706,16 @@ export async function playNuvioStream(
   onOpenTab?: (type: any, title: string, data?: any) => void
 ) {
   if (!onOpenTab) return;
-  // Links externos (páginas) abrem no navegador do app
+  // Links para páginas (ex.: YouTube ou a página de um vídeo): o player do app acha o vídeo nelas e toca aqui dentro
   if (stream.type === 'external') {
-    onOpenTab('webview', ctx.title, { url: stream.url, initialUrl: stream.url });
+    onOpenTab('video-player', ctx.title, {
+      filePath: stream.url,
+      title: ctx.title,
+      item: { path: stream.url, name: ctx.title },
+      episodeUrl: ctx.episodeUrl,
+      stremio: ctx.stremio ? { type: ctx.stremio.type, id: ctx.stremio.id } : undefined,
+      work: ctx.work,
+    });
     return;
   }
   const torrent = isTorrentStream(stream);

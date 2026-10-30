@@ -2,6 +2,7 @@
 // "Continuar assistindo": guarda o último ponto de cada obra e como reabrir o mesmo vídeo
 // (mesmo link/fonte), para retomar com um clique.
 
+import { isIncognito } from './incognito';
 export const CONTINUE_EVENT = 'tomodachi:continue-changed';
 const KEY = 'tp_continue_watching';
 const MAX = 40;
@@ -53,7 +54,7 @@ function write(list: ResumeEntry[], notify = true) {
 
 /** Grava/atualiza o ponto de um episódio (uma entrada por obra: o episódio mais recente) */
 export function recordResume(e: Omit<ResumeEntry, 'at'>, notify = false) {
-  if (!e.key || !isFinite(e.t)) return;
+  if (!e.key || !isFinite(e.t) || isIncognito('video')) return;
   const list = read().filter((x) => x.key !== e.key && !(e.workUrl && x.workUrl === e.workUrl));
   // Quase no fim: tira da lista (o episódio foi concluído)
   if (e.d > 0 && e.t > e.d - 20) {

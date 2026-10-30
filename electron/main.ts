@@ -20,6 +20,7 @@ import { registerTorrentIpc, stopTorrentEngine } from './torrent';
 import { streamHeadersFor } from './streamHeaders';
 import { registerSecretsIpc } from './secrets';
 import { registerMalIpc } from './mal';
+import { sniffMedia } from './videoSniffer';
 import { registerAniListAuthIpc } from './anilistAuth';
 import {
   setupAdblocker,
@@ -1139,165 +1140,37 @@ async function extractVideoStream(pageUrl: string): Promise<{
         }
 
         if (discoveredServers.length > 0) {
-          const best = discoveredServers.find(s => s.name === 'LuluStream') ||
-                       discoveredServers.find(s => s.name === 'MaxStream') ||
-                       discoveredServers[0];
-
-          return {
-            success: true,
-            type: 'embed',
-            embedUrl: best.url,
-            url: best.url,
-            referer: pageUrl,
-            servers: discoveredServers,
-          };
+          // Vários servidores: acha o vídeo do primeiro que funcionar (os outros ficam para trocar no player)
+          const ordered = [
+            ...discoveredServers.filter((s) => s.name === 'LuluStream'),
+            ...discoveredServers.filter((s) => s.name === 'MaxStream'),
+            ...discoveredServers.filter((s) => s.name !== 'LuluStream' && s.name !== 'MaxStream'),
+          ];
+          for (const srv of ordered) {
+            const hit = await sniffMedia(srv.url, { referer: pageUrl, timeoutMs: 20000 });
+            if (hit) {
+              return { success: true, type: 'stream', streamUrl: hit.url, url: hit.url, referer: hit.referer, servers: discoveredServers };
+            }
+          }
+          return { success: false, error: 'Nenhum servidor entregou o vídeo', servers: discoveredServers };
         }
       }
 
-      // Iframes diretos na página
-      const iframeMatches = [...html.matchAll(/<iframe[^>]+src="([^">]+)"/gi)].map(m => m[1]);
-      for (const ifr of iframeMatches) {
-        if (/stream|player|embed|video|searcho/i.test(ifr) && !/ads|pop|banner|tracker|google|smartpop|mayzaent/i.test(ifr)) {
-          return { success: true, type: 'embed', embedUrl: ifr, url: ifr, referer: pageUrl };
-        }
-      }
     }
   } catch (err: any) {
     console.warn(`[extractVideoStream static failed]:`, err.message);
   }
 
-  // 2. TENTATIVA DINÂMICA: Off-screen BrowserWindow interceptando requisições de mídia de rede
-  return new Promise((resolve) => {
-    let finished = false;
-    let timeoutId: NodeJS.Timeout | null = null;
-    let capturedStream: string | null = null;
-
-    const scraperWin = new BrowserWindow({
-      show: false,
-      width: 1280,
-      height: 900,
-      webPreferences: {
-        images: true,
-        javascript: true,
-        webSecurity: false,
-        backgroundThrottling: false,
-        partition: 'persist:user_session',
-      },
-    });
-
-    const finish = (result: {
-      success: boolean;
-      type?: 'stream' | 'embed';
-      streamUrl?: string;
-      embedUrl?: string;
-      url?: string;
-      referer?: string;
-      servers?: Array<{ name: string; url: string }>;
-      error?: string;
-    }) => {
-      if (finished) return;
-      finished = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      try {
-        scraperWin.destroy();
-      } catch {}
-      if (result.success && !result.url) {
-        result.url = result.streamUrl || result.embedUrl;
-      }
-      resolve(result);
-    };
-
-    timeoutId = setTimeout(() => {
-      if (capturedStream) {
-        finish({ success: true, type: 'stream', streamUrl: capturedStream, referer: pageUrl });
-      } else {
-        finish({ success: false, error: 'Tempo limite ao capturar stream de vídeo' });
-      }
-    }, 12000);
-
-    scraperWin.webContents.session.webRequest.onResponseStarted(
-      { urls: ['*://*/*'] },
-      (details) => {
-        const u = details.url;
-        const contentType = details.responseHeaders?.['content-type']?.[0]?.toLowerCase() || '';
-        if (
-          (/\.(?:m3u8|mp4)(?:\?.*)?$/i.test(u) ||
-          contentType.includes('video/mp4') ||
-          contentType.includes('application/x-mpegurl') ||
-          contentType.includes('application/vnd.apple.mpegurl')) &&
-          !/analytics|track|diagramjawlineunhappy|popunder|pemsrv|smartpop|mayzaent|greentrafsa|silent-basis|exoclick|syndication/i.test(u)
-        ) {
-          capturedStream = u;
-          finish({ success: true, type: 'stream', streamUrl: u, referer: pageUrl });
-        }
-      }
-    );
-
-    const inspectDom = async () => {
-      if (finished) return;
-      try {
-        // Tenta acionar reprodução em frames filhos (para disparar carregamento do player/mídia)
-        const frames = scraperWin.webContents.mainFrame.frames;
-        for (const frame of frames) {
-          try {
-            await frame.executeJavaScript(`
-              (() => {
-                if (typeof start_player === 'function') start_player();
-                const btn = document.querySelector('#overlay_layer, .playbutton, .play-btn, button[class*="play"]');
-                if (btn) btn.click();
-              })()
-            `);
-          } catch {}
-        }
-
-        const domInfo = await scraperWin.webContents.executeJavaScript(`
-          (() => {
-            const v = document.querySelector('video');
-            if (v && v.src && /^https?:\\/\\//i.test(v.src)) {
-              return { type: 'stream', url: v.src };
-            }
-            const s = document.querySelector('source');
-            if (s && s.src && /^https?:\\/\\//i.test(s.src)) {
-              return { type: 'stream', url: s.src };
-            }
-            const iframes = document.querySelectorAll('iframe');
-            for (const ifr of iframes) {
-              const src = ifr.src;
-              if (src && /player|embed|stream|video|searcho/i.test(src) && !/ads|pop|banner|track|smartpop|mayzaent|greentrafsa/i.test(src)) {
-                return { type: 'embed', url: src };
-              }
-            }
-            return null;
-          })()
-        `);
-
-        if (domInfo && domInfo.url) {
-          finish({
-            success: true,
-            type: domInfo.type as any,
-            streamUrl: domInfo.type === 'stream' ? domInfo.url : undefined,
-            embedUrl: domInfo.type === 'embed' ? domInfo.url : undefined,
-            referer: pageUrl,
-          });
-          return;
-        }
-      } catch {}
-    };
-
-    scraperWin.webContents.on('did-finish-load', () => {
-      setTimeout(inspectDom, 1500);
-      setTimeout(inspectDom, 3500);
-    });
-
-    scraperWin.loadURL(pageUrl, {
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    }).catch((err) => {
-      finish({ success: false, error: err.message });
-    });
-  });
+  // 2. Abre a página escondida, aperta play nos players (inclusive em iframes) e captura o vídeo na rede.
+  //    Nunca devolve a página do site: se não achar o vídeo, o player avisa e oferece outras fontes.
+  try {
+    const hit = await sniffMedia(pageUrl);
+    if (hit) return { success: true, type: 'stream', streamUrl: hit.url, url: hit.url, referer: hit.referer };
+  } catch (err: any) {
+    console.warn('[extractVideoStream sniff failed]:', err?.message || err);
+  }
+  return { success: false, error: 'O site não entregou o vídeo' };
 }
-
-
 
 async function resolveAndCacheImage(imageUrl: string, sourceName?: string): Promise<{ success: boolean; url?: string; error?: string }> {
   try {

@@ -33,7 +33,6 @@ import {
   resolveSourceBaseUrl,
   buildChapterWebUrl,
   buildMangaWebUrl,
-  buildAnimeWatchWebUrl,
   findExtensionInRepos,
   installExtension as registerExtension,
   isExtensionInstalled,
@@ -588,7 +587,7 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
     if (!isManga) {
       // Abre o player nativo; o episódio é marcado como visto ao chegar perto do fim
       openVideoEpisode(manga, chapter, onOpenTab);
-      updateChapterProgress('video', { [chapter.url]: {} }, { silent: true });
+      updateChapterProgress('video', { [chapter.url]: {} }, { silent: true, auto: true });
       setSelectedItem(null);
       setLoadingChapterUrl(null);
       return;
@@ -1311,20 +1310,6 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
                           <span>{t('Assistir no Player')}</span>
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const epNum = nextChapterToRead?.number || 1;
-                            const url = buildAnimeWatchWebUrl(selectedItem.title, epNum, selectedItem.sourceName);
-                            onOpenTab?.('webview', t('Assistir: {name}', { name: selectedItem.title }), { url, initialUrl: url });
-                            setSelectedItem(null);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-subtle hover:bg-elevated text-accent hover:text-white rounded border border-line text-xs font-semibold transition-colors cursor-pointer shadow-xs"
-                          title={t('Assistir através da Webview integrada')}
-                        >
-                          <Globe size={13} />
-                          <span>{t('Assistir na Webview')}</span>
-                        </button>
                       </>
                     )}
 
@@ -1492,22 +1477,6 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
                               )}
                             </button>
 
-                            {!isManga && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const epNum = c.number || idx + 1;
-                                  const url = buildAnimeWatchWebUrl(selectedItem.title, epNum, selectedItem.sourceName);
-                                  onOpenTab?.('webview', t('Assistir: {title} Ep {n}', { title: selectedItem.title, n: epNum }), { url, initialUrl: url });
-                                }}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface hover:bg-subtle text-accent hover:text-white border border-line transition-colors text-[11px] font-semibold shrink-0 cursor-pointer"
-                                title={t('Assistir episódio na Webview')}
-                              >
-                                <Globe size={10} />
-                                <span>Webview</span>
-                              </button>
-                            )}
                           </div>
                         </div>
                       );

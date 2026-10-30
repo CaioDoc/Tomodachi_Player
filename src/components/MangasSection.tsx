@@ -9,7 +9,7 @@ import { LocalExplorer } from './LocalExplorer';
 import { MihonLibrary } from './MihonLibrary';
 import { ContinueReading } from './ContinueReading';
 import { SuwayomiBrowser } from './SuwayomiBrowser';
-import { SourceChip, KeepAliveViews, SectionTabBar, SectionAction, type SectionGroup, DonateAction } from './SectionChrome';
+import { SourceChip, KeepAliveViews, SectionTabBar, SectionAction, type SectionGroup, DonateAction, IncognitoAction } from './SectionChrome';
 import { openDonate } from '../constants/support';
 import { UpdatesView, HistoryView } from './ActivityViews';
 import { getInstalledExtensions, type InstalledExtension } from '../api/extensionRegistry';
@@ -244,6 +244,7 @@ export const MangasSection: React.FC<MangasSectionProps> = ({
           active={view === 'history'}
           onClick={() => onChangeView(view === 'history' ? 'library' : 'history')}
         />
+        <IncognitoAction source="manga" />
         <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
         <SectionAction
           primary
@@ -265,11 +266,15 @@ export const MangasSection: React.FC<MangasSectionProps> = ({
           active={view === 'extensions' || view === 'repos'}
           onClick={() => onChangeView(view === 'extensions' || view === 'repos' ? 'online' : 'extensions')}
         />
+        <IncognitoAction source="manga" />
         <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
         <SectionAction icon={<ArchiveRestore size={14} />} label={t('Backup')} active={!!backupMode} onClick={() => setBackupMode('menu')} />
       </>
     ) : (
-      <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
+      <>
+        <IncognitoAction source="manga" />
+        <DonateAction label={t('Doar')} title={t('Apoie o Tomodachi Player')} onClick={openDonate} />
+      </>
     );
 
   return (
