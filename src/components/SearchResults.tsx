@@ -62,6 +62,8 @@ export interface SearchResultsStatus {
   loading: boolean;
   /** Quantas obras sobraram depois de filtrar por relevância */
   results: number;
+  /** Quantas as fontes trouxeram mas não batem com o texto */
+  hidden?: number;
 }
 
 const BROWSE_PAGES = 3;
@@ -91,6 +93,19 @@ const yearNum = (y?: string | number) => {
 
 const genreKey = (g: string) => canonicalGenre(g) || norm(g);
 
+/** Uma obra na lista de resultados (a mesma obra pode vir de várias fontes) */
+interface ResultItem {
+  key: string;
+  title: string;
+  cover?: string;
+  year?: number;
+  type?: 'movie' | 'series';
+  score?: number;
+  scoreFrom?: string;
+  sources: SourceRef[];
+  rel: number;
+}
+
 export const SearchResults: React.FC<{
   query: string;
   /** Gêneros/tags pedidos na busca (ex.: "Seinen, Monster" → Seinen) */
@@ -98,7 +113,9 @@ export const SearchResults: React.FC<{
   kind?: 'anilist' | 'series' | 'movie';
   onOpenTab?: OpenTabFn;
   onStatus?: (s: SearchResultsStatus) => void;
-}> = ({ query, genres = [], kind = 'anilist', onOpenTab, onStatus }) => {
+  /** Mostrar também o que as fontes trouxeram mas não bate com o texto */
+  showWeak?: boolean;
+}> = ({ query, genres = [], kind = 'anilist', onOpenTab, onStatus, showWeak }) => {
   const [version, setVersion] = useState(0);
   const [states, setStates] = useState<SourceState[]>([]);
   const [enrich, setEnrich] = useState<EnrichIndex | null>(null);
@@ -309,8 +326,11 @@ export const SearchResults: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, sources]);
 
+  /** Resultados que as fontes trouxeram mas não batem com o texto (mostrados só se o usuário pedir) */
+  const weakRef = useRef<ResultItem[]>([]);
   // Junta, filtra por relevância e ordena
   const results = useMemo(() => {
+    const weak: ResultItem[] = [];
     const q = query.trim();
     const wantGenres = genres.map(genreKey).filter(Boolean);
     const groups = new Map<string, { hits: RawHit[] }>();
@@ -331,24 +351,28 @@ export const SearchResults: React.FC<{
         groups.set(key, g);
       }
     }
-    const out: Array<{
-      key: string;
-      title: string;
-      cover?: string;
-      year?: number;
-      type?: 'movie' | 'series';
-      score?: number;
-      scoreFrom?: string;
-      sources: SourceRef[];
-      rel: number;
-    }> = [];
+    const out: ResultItem[] = [];
     for (const [key, g] of groups) {
       const first = g.hits[0];
       const extra = enrich?.find(first.title);
       const titles = [first.title, ...g.hits.map((h) => h.title), ...(extra?.titles || [])];
       const rel = bestRelevance(titles, q);
-      if (rel < MIN_RELEVANCE) continue;
       const type = g.hits.find((h) => h.type)?.type;
+      if (rel < MIN_RELEVANCE) {
+        // Guardado para o "ver o que as fontes trouxeram" (a fonte respondeu, só não bateu com o texto)
+        weak.push({
+          key,
+          title: first.title,
+          cover: extra?.cover || g.hits.find((h) => h.cover)?.cover,
+          year: yearNum(first.year) || extra?.year,
+          type,
+          score: extra?.score,
+          scoreFrom: extra?.scoreFrom,
+          sources: Array.from(new Map(g.hits.map((h) => [h.source.id, h.source])).values()),
+          rel,
+        });
+        continue;
+      }
       if (kind === 'series' && type === 'movie') continue;
       if (kind === 'movie' && type === 'series') continue;
       if (wantGenres.length) {
@@ -372,27 +396,37 @@ export const SearchResults: React.FC<{
       });
     }
     out.sort((a, b) => b.rel - a.rel || b.sources.length - a.sources.length || (b.score || 0) - (a.score || 0));
+    weak.sort((a, b) => b.rel - a.rel);
+    weakRef.current = weak.slice(0, 60);
     return out;
   }, [states, enrich, query, genres, kind]);
+  // Nada bateu com o texto, mas as fontes trouxeram coisas: o usuário pode pedir para ver
+  const weakResults = weakRef.current;
+  const shown = results.length ? results : showWeak ? weakResults : [];
 
   const loading = states.filter((s) => s.status === 'loading').length;
   const active = !!query.trim() && total > 0;
 
   useEffect(() => {
-    onStatus?.({ sources: active ? total : 0, loading: active && (loading > 0 || states.length === 0), results: results.length });
+    onStatus?.({ sources: active ? total : 0, loading: active && (loading > 0 || states.length === 0), results: results.length, hidden: weakResults.length });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, total, loading, results.length, states.length]);
+  }, [active, total, loading, results.length, weakResults.length, states.length]);
 
-  if (!active || (loading === 0 && results.length === 0)) return null;
+  if (!active || (loading === 0 && shown.length === 0)) return null;
 
-  const empty = states.filter((s) => s.status !== 'loading' && !results.some((r) => r.sources.some((x) => x.id === s.id)));
+  const empty = states.filter((s) => s.status !== 'loading' && !shown.some((r) => r.sources.some((x) => x.id === s.id)));
   const iconFor = (k: SourceKind) => (k === 'site' ? <Globe size={11} /> : k === 'links' ? <Link2 size={11} /> : <Package size={11} />);
 
   return (
     <section className="flex-1 min-h-0 overflow-y-auto" aria-label={t('Resultados nas suas fontes')}>
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2.5 bg-canvas/95 backdrop-blur border-b border-line-subtle text-[12px]">
-        <span className="font-semibold text-fg">{tn(results.length, '{n} obra encontrada', '{n} obras encontradas')}</span>
-        <span className="text-fg-muted">· {t('nas suas fontes, das que mais batem com "{q}" para as que menos batem', { q: query.trim() })}</span>
+        <span className="font-semibold text-fg">{tn(shown.length, '{n} obra encontrada', '{n} obras encontradas')}</span>
+        <span className="text-fg-muted">
+          ·{' '}
+          {results.length
+            ? t('nas suas fontes, das que mais batem com "{q}" para as que menos batem', { q: query.trim() })
+            : t('é o que as suas fontes trouxeram para "{q}" (nenhuma com esse nome exato)', { q: query.trim() })}
+        </span>
         {loading > 0 && (
           <span className="inline-flex items-center gap-1.5 text-fg-muted">
             <Loader2 size={12} className="animate-spin text-accent" /> {t('buscando em {n} de {total}…', { n: loading, total: states.length })}
@@ -406,7 +440,7 @@ export const SearchResults: React.FC<{
       </div>
 
       <div className="p-4 grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
-        {results.map((r) => {
+        {shown.map((r) => {
           const main = r.sources[0];
           const more = r.sources.length > 1;
           return (
@@ -478,7 +512,7 @@ export const SearchResults: React.FC<{
           );
         })}
         {loading > 0 &&
-          Array.from({ length: results.length ? 4 : 12 }).map((_, i) => (
+          Array.from({ length: shown.length ? 4 : 12 }).map((_, i) => (
             <div key={`sk-${i}`}>
               <div className="aspect-[2/3] rounded-lg bg-subtle animate-pulse" />
               <div className="mt-1.5 h-3 w-3/4 rounded bg-subtle animate-pulse" />

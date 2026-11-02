@@ -172,7 +172,7 @@ export interface ElectronAPI {
   malTest: (clientId: string) => Promise<{ success: boolean; count?: number; error?: string }>;
   malClearCache: () => Promise<{ success: boolean }>;
   /** HTML de uma página de site (pedido simples ou, se bloqueado, como navegador) */
-  siteFetchHtml: (args: { url: string; referer?: string; noCache?: boolean }) => Promise<{ success: boolean; html?: string; url?: string; via?: 'http' | 'browser'; error?: string }>;
+  siteFetchHtml: (args: { url: string; referer?: string; noCache?: boolean; browser?: boolean }) => Promise<{ success: boolean; html?: string; url?: string; via?: 'http' | 'browser'; error?: string }>;
   anilistLogin: () => Promise<{ success: boolean; token?: string; expiresAt?: number; error?: string }>;
   anilistLogout: () => Promise<{ success: boolean }>;
   adblockGetSettings: () => Promise<AdblockSettingsInfo>;

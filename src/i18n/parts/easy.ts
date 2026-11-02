@@ -27,6 +27,20 @@ const parts: Parts = {
   'Onde buscar': ['Where to search', 'Dónde buscar'],
   'Escolha onde buscar': ['Choose where to search', 'Elige dónde buscar'],
   'Todas as fontes': ['All sources', 'Todas las fuentes'],
+  'As fontes responderam, mas nenhum nome bate com a busca': [
+    'The sources answered, but no name matches the search',
+    'Las fuentes respondieron, pero ningún nombre coincide con la búsqueda',
+  ],
+  'Ver a obra que a fonte trouxe': ['See the title the source returned', 'Ver la obra que trajo la fuente'],
+  'Ver as {n} obras que as fontes trouxeram': ['See the {n} titles the sources returned', 'Ver las {n} obras que trajeron las fuentes'],
+  'é o que as suas fontes trouxeram para "{q}" (nenhuma com esse nome exato)': [
+    'this is what your sources returned for "{q}" (none with that exact name)',
+    'esto es lo que trajeron tus fuentes para "{q}" (ninguna con ese nombre exacto)',
+  ],
+  '{source} respondeu isto para "{query}" (nenhuma com esse nome exato)': [
+    '{source} returned this for "{query}" (none with that exact name)',
+    '{source} respondió esto para "{query}" (ninguna con ese nombre exacto)',
+  ],
   'Abrir o site': ['Open the site', 'Abrir el sitio'],
   'Catálogo de {label} (pág. {page})': ['{label} catalog (page {page})', 'Catálogo de {label} (pág. {page})'],
   Vídeo: ['Video', 'Video'],

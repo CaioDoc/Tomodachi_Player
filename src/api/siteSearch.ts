@@ -47,10 +47,10 @@ function saveTemplate(host: string, tpl: string | null) {
   }
 }
 
-async function getDoc(url: string, referer?: string): Promise<{ doc: Document; url: string } | null> {
+async function getDoc(url: string, referer?: string, browser = false): Promise<{ doc: Document; url: string } | null> {
   const api = window.electronAPI;
   if (!api?.siteFetchHtml) return null;
-  const res = await api.siteFetchHtml({ url, referer });
+  const res = await api.siteFetchHtml({ url, referer, browser });
   if (!res?.success || !res.html) return null;
   const doc = new DOMParser().parseFromString(res.html, 'text/html');
   return { doc, url: res.url || url };
@@ -219,12 +219,24 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
   const tryTemplate = async (tpl: string) => {
     if (tried.has(tpl)) return false;
     tried.add(tpl);
-    const page = await getDoc(fill(tpl, base, query.trim()), base);
+    const url = fill(tpl, base, query.trim());
+    let page = await getDoc(url, base);
     if (!page) return false;
     reachable = true;
-    const items = extractSiteItems(page.doc, page.url, scorer);
+    let items = extractSiteItems(page.doc, page.url, scorer);
+    // Sites que montam os resultados com JavaScript devolvem uma página vazia no pedido simples:
+    // carrega de novo como navegador (é o que o usuário vê ao abrir o site)
+    if (items.length === 0) {
+      const rendered = await getDoc(url, base, true).catch(() => null);
+      if (rendered) {
+        page = rendered;
+        items = extractSiteItems(rendered.doc, rendered.url, scorer);
+      }
+    }
     const top = Math.max(0, ...items.map((i) => scorer(i.title)));
-    if (top > bestTop) {
+    // Guarda o que o site respondeu mesmo quando nada bate com a busca: quem chamou decide o que
+    // mostrar (é o mesmo resultado que a pessoa veria abrindo o site)
+    if (top > bestTop || best.length === 0) {
       best = items;
       bestTop = top;
     }
@@ -237,13 +249,17 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
     return false;
   };
 
-  // Jeito de buscar já conhecido: confia nele (a obra pode simplesmente não estar no site)
+  // Jeito de buscar já conhecido: usa ele primeiro. Se não vier nada (o site mudou, ou o endereço
+  // guardado não é mesmo o da busca), procura o formulário de novo em vez de desistir
   if (saved) {
     await tryTemplate(saved);
-    if (reachable) return best;
+    if (best.length) return best;
+    saveTemplate(host, null);
   }
   // Formulário de busca da página inicial (o jeito "oficial" do site): guarda mesmo sem achar a obra
-  const home = noFormHosts.has(host) ? null : await getDoc(base);
+  let home = noFormHosts.has(host) ? null : await getDoc(base);
+  // Página inicial montada por JavaScript: o formulário de busca só existe depois de carregar
+  if (home && !findSearchTemplate(home.doc, home.url)) home = (await getDoc(base, undefined, true).catch(() => null)) || home;
   if (home) {
     reachable = true;
     const tpl = findSearchTemplate(home.doc, home.url);

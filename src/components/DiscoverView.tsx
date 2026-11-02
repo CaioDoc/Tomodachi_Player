@@ -72,6 +72,8 @@ export const DiscoverView: React.FC<{
   const [actionsEl, setActionsEl] = useState<HTMLDivElement | null>(null);
   // Resultado da busca nas fontes (para o aviso de "nada encontrado")
   const [srcStatus, setSrcStatus] = useState<SearchResultsStatus>({ sources: 0, loading: false, results: 0 });
+  // "Ver o que as fontes trouxeram": mostra o que veio das fontes mesmo sem bater com o texto
+  const [showWeak, setShowWeak] = useState(false);
 
   const setKind = (k: Kind) => {
     setKindState(k);
@@ -131,7 +133,8 @@ export const DiscoverView: React.FC<{
   // Só gêneros/tags (ex.: tag clicada numa obra) continua navegando pelo catálogo.
   const searchMode = !!sourcesQuery;
   const filterTerms = useMemo(() => parts.filter((p) => p.kind !== 'text').map((p) => p.value), [parts]);
-  const nothingFound = searchMode && !srcStatus.loading && srcStatus.results === 0;
+  // Depois de pedir para ver o que as fontes trouxeram, o aviso de "nada encontrado" sai da frente
+  const nothingFound = searchMode && !srcStatus.loading && srcStatus.results === 0 && !(showWeak && (srcStatus.hidden || 0) > 0);
   const clearSearch = () => {
     setInput('');
     setQuery('');
@@ -148,6 +151,9 @@ export const DiscoverView: React.FC<{
     const id = setTimeout(() => setQuery(input.trim()), 450);
     return () => clearTimeout(id);
   }, [input]);
+  useEffect(() => {
+    setShowWeak(false);
+  }, [query, kind]);
 
   const placeholder = useMemo(() => {
     const one = pickedExt?.name || pickedCatalog?.addon.name;
@@ -302,7 +308,7 @@ export const DiscoverView: React.FC<{
         </div>
       ) : (
         <>
-      {searchMode && <SearchResults query={sourcesQuery} genres={filterTerms} kind={kind} onOpenTab={onOpenTab} onStatus={setSrcStatus} />}
+      {searchMode && <SearchResults query={sourcesQuery} genres={filterTerms} kind={kind} onOpenTab={onOpenTab} onStatus={setSrcStatus} showWeak={showWeak} />}
 
       {!query && <ContinueWatching onOpenTab={onOpenTab} />}
 
@@ -338,6 +344,16 @@ export const DiscoverView: React.FC<{
                   )}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  {!!srcStatus.hidden && (
+                    <button
+                      type="button"
+                      onClick={() => setShowWeak(true)}
+                      className="h-8 px-3.5 rounded-md bg-accent text-accent-fg text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                      title={t('As fontes responderam, mas nenhum nome bate com a busca')}
+                    >
+                      <Search size={13} /> {tn(srcStatus.hidden, 'Ver a obra que a fonte trouxe', 'Ver as {n} obras que as fontes trouxeram')}
+                    </button>
+                  )}
                   {kind !== 'anilist' && (
                     <button
                       type="button"

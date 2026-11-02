@@ -102,13 +102,22 @@ function viaBrowser(url: string, timeoutMs = 15000): Promise<FetchHtmlResult> {
   });
 }
 
-export async function fetchHtml(url: string, opts: { referer?: string; noCache?: boolean } = {}): Promise<FetchHtmlResult> {
+export async function fetchHtml(url: string, opts: { referer?: string; noCache?: boolean; browser?: boolean } = {}): Promise<FetchHtmlResult> {
   if (!/^https?:\/\//i.test(url)) return { success: false, error: 'URL inválida' };
   const hit = cache.get(url);
-  if (!opts.noCache && hit && Date.now() - hit.at < CACHE_MS) return { success: true, html: hit.html, url: hit.url, via: 'http' };
+  if (!opts.noCache && !opts.browser && hit && Date.now() - hit.at < CACHE_MS) return { success: true, html: hit.html, url: hit.url, via: 'http' };
   const host = hostOf(url);
   const downAt = downHosts.get(host);
   if (downAt && Date.now() - downAt < DOWN_MS) return { success: false, error: 'O site não respondeu' };
+  // Página montada por JavaScript (a busca do site não aparece no HTML simples): carrega como navegador
+  if (opts.browser) {
+    const r = await viaBrowser(url);
+    if (r.success && r.html) {
+      browserHosts.add(host);
+      cache.set(url, { at: Date.now(), html: r.html, url: r.url || url });
+    }
+    return r;
+  }
   let result: FetchHtmlResult = { success: false, error: 'blocked' };
   if (!browserHosts.has(host)) {
     try {
@@ -132,5 +141,7 @@ export async function fetchHtml(url: string, opts: { referer?: string; noCache?:
 }
 
 export function registerSiteFetchIpc() {
-  ipcMain.handle('site:fetchHtml', (_e, args: { url: string; referer?: string; noCache?: boolean }) => fetchHtml(String(args?.url || ''), { referer: args?.referer, noCache: !!args?.noCache }));
+  ipcMain.handle('site:fetchHtml', (_e, args: { url: string; referer?: string; noCache?: boolean; browser?: boolean }) =>
+    fetchHtml(String(args?.url || ''), { referer: args?.referer, noCache: !!args?.noCache, browser: !!args?.browser })
+  );
 }

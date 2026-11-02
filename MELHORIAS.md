@@ -666,3 +666,17 @@ A busca de **Animes & Vídeos** ganhou um seletor colado ao campo, igual ao que 
 - O texto do campo acompanha a escolha ("Buscar em Anime Fire…").
 
 Teste automático novo: o seletor tem "Todas as fontes" e as extensões instaladas; escolher uma abre o catálogo dela e a busca encontra a obra ali dentro.
+
+## A busca do app agora acha o que o site acha (1.9.1-beta)
+
+Quando você procurava pelo navegador (Browse) dentro da extensão o site achava a obra, mas a busca do app dizia que não encontrou. Três motivos, todos corrigidos:
+
+| Problema | Correção |
+|---|---|
+| **O app jogava fora o que o site respondeu** quando nenhum título batia exatamente com o texto digitado. | A resposta do site é sempre guardada. Se nada bate, o app avisa e oferece **"Ver as obras que as fontes trouxeram"** — o mesmo que você veria abrindo o site. Buscando dentro de uma fonte só, elas já aparecem direto. |
+| **Nomes escritos de outro jeito ficavam de fora** ("Shippuuden" x "Shippuden", "Ousama" x "Osama", "Youjo" x "Yojo", "Death Note" x "note death"). | A comparação de títulos agora aceita variações de romanização e palavras fora de ordem, sem deixar passar o que não tem nada a ver (continua filtrando "Bad Guys" para "Breaking Bad"). |
+| **Sites que montam a busca com JavaScript** devolviam uma página vazia para o app (mas funcionavam no Browse). | Quando a página de resultados vem vazia, o app a carrega de novo **como navegador**, do mesmo jeito que o Browse — e lê os resultados. O mesmo vale para achar o formulário de busca do site. |
+
+Também: o endereço de busca guardado de cada site deixa de ser usado quando para de trazer resultados (o site mudou) — o app procura o formulário de novo em vez de desistir.
+
+Teste automático novo: com uma busca que não bate com nada, o app avisa e, ao pedir, mostra a obra que o site respondeu.

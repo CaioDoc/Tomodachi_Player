@@ -34,7 +34,8 @@ http
     if (u.pathname === '/pesquisar') {
       const q = (u.searchParams.get('busca') || '').toLowerCase();
       const card = (slug, title) => `<div class="item"><a href="/anime/${slug}"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-src="/capa/${slug}.jpg" alt=""></a><h3 class="title"><a href="/anime/${slug}">${title}</a></h3></div>`;
-      const results = /tomodachi|teste/.test(q) ? card('tomodachi-teste', 'Tomodachi Teste Dublado') + card('tomodachi-teste-2', 'Tomodachi Teste 2nd Season') : '';
+      // Sem resultado o site sugere outra obra (muitos fazem isso): o app mostra isso só se o usuário pedir
+      const results = /tomodachi|teste/.test(q) ? card('tomodachi-teste', 'Tomodachi Teste Dublado') + card('tomodachi-teste-2', 'Tomodachi Teste 2nd Season') : card('sugestao-do-site', 'Sugestão Do Site');
       return html(nav + `<main class="results">${results || '<p>Nenhum resultado</p>'}</main><aside class="sidebar"><a href="/anime/naruto"><img src="/n.jpg" alt="Naruto Shippuden"></a></aside><footer><a href="/dmca">DMCA</a></footer>`);
     }
     if (u.pathname.startsWith('/anime/')) {
@@ -575,6 +576,29 @@ await step('Extensão · "Assistir" toca o episódio na hora (sem passar pelo pa
   if (webviews) throw new Error('abriu o site num navegador');
   if (!/sample\.mp4/.test(src)) throw new Error('tocou outra coisa: ' + src);
   return `tocou em ${secs}s direto do botão "${label}" (sem painel)`;
+});
+
+await step('Busca · mostra o que a fonte respondeu quando nada bate com o texto', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('Qzxvv Obra Inexistente');
+  await page.locator('text=/Nada encontrado para/ >> visible=true').first().waitFor({ timeout: 60000 });
+  await sleep(1500);
+  await shot(page, 'busca-nada-bate');
+  const reveal = page.getByRole('button', { name: /^Ver (a obra|as \d+ obras)/ }).first();
+  const has = await reveal.count();
+  if (!has) throw new Error('não ofereceu ver o que a fonte respondeu');
+  await reveal.click();
+  await sleep(1500);
+  await shot(page, 'busca-nada-bate-revelado');
+  const shown = await page.locator('section[aria-label="Resultados nas suas fontes"] >> text=Sugestão Do Site >> visible=true').count();
+  const stillEmpty = await page.locator('text=/Nada encontrado para/ >> visible=true').count();
+  await input.fill('');
+  await sleep(1000);
+  if (!shown) throw new Error('não mostrou a obra que o site respondeu');
+  if (stillEmpty) throw new Error('o aviso de "nada encontrado" continuou na tela');
+  return 'o app avisa que nada bate e, se o usuário pedir, mostra o que a fonte respondeu';
 });
 
 await step('Fontes · Browse abre o site com "Assistir no app"', async () => {

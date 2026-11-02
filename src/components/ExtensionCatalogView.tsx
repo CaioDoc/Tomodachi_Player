@@ -203,6 +203,8 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
   const videoProfile = useMemo(() => getVideoProfile(extName, extLang), [extName, extLang]);
   /** As obras vieram do próprio site da extensão (e não do catálogo do AniList) */
   const [fromSiteCatalog, setFromSiteCatalog] = useState(false);
+  /** A busca no site respondeu, mas nenhum título bate com o que foi digitado */
+  const [weakSearch, setWeakSearch] = useState(false);
   const [catalogPage, setCatalogPage] = useState<number>(1);
   const [refreshNonce, setRefreshNonce] = useState<number>(0);
 
@@ -214,6 +216,11 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
   useEffect(() => {
     if (externalQuery !== undefined) setQuery(externalQuery);
   }, [externalQuery]);
+
+  // Busca nova: o aviso de "nenhuma com esse nome" começa limpo
+  useEffect(() => {
+    setWeakSearch(false);
+  }, [debouncedQuery, extName]);
 
   // Debounce search
   useEffect(() => {
@@ -552,13 +559,15 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
         const job: Promise<{ success: boolean; items: any[] }> =
           q
             ? searchSite(rawDomain || targetWebUrl, q, (cand) => relevance(cand, q) / 100)
-                .then((items) => ({
-                  success: true,
-                  items: items
-                    .filter((it) => relevance(it.title, q) >= MIN_RELEVANCE)
-                    .sort((x, y) => relevance(y.title, q) - relevance(x.title, q))
-                    .map((it) => ({ title: it.title, url: it.url, cover: it.cover || '' })),
-                }))
+                .then((items) => {
+                  const sorted = [...items].sort((x, y) => relevance(y.title, q) - relevance(x.title, q));
+                  const good = sorted.filter((it) => relevance(it.title, q) >= MIN_RELEVANCE);
+                  // Buscando dentro de UMA fonte: se nada bate exatamente, mostra o que o site respondeu
+                  // (é o mesmo resultado que apareceria abrindo o site), em vez de dizer que não achou
+                  const list = good.length ? good : sorted.filter((it) => !it.isEpisode).slice(0, 24);
+                  setWeakSearch(!good.length && list.length > 0);
+                  return { success: true, items: list.map((it) => ({ title: it.title, url: it.url, cover: it.cover || '' })) };
+                })
                 .catch(() => ({ success: false, items: [] }))
             : window.electronAPI.scrapeExtensionCatalog({
                 baseUrl: rawDomain || targetWebUrl,
@@ -1056,7 +1065,9 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                     <Sparkles size={16} className="text-accent" />
                     <span>
                       {debouncedQuery
-                        ? t('Resultados da busca online para "{query}"', { query: debouncedQuery })
+                        ? weakSearch
+                          ? t('{source} respondeu isto para "{query}" (nenhuma com esse nome exato)', { source: extName, query: debouncedQuery })
+                          : t('Resultados da busca online para "{query}"', { query: debouncedQuery })
                         : t('Catálogo de {label} (pág. {page})', { label: fromSiteCatalog ? extName : videoProfile.label, page: catalogPage })}
                     </span>
                   </h3>

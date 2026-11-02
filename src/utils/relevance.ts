@@ -59,8 +59,52 @@ export function relevance(title: string, query: string): number {
   if (compact(t).includes(compact(q)) && q.length >= 4) return 72 - lengthPenalty;
 
   // Todas as palavras, mas fora de ordem: fraco
-  if (qw.every(matches)) return 48 - lengthPenalty;
+  if (qw.every(matches)) return 58 - lengthPenalty;
+
+  // Quase igual, escrito de outro jeito ("Shippuden" x "Shippuuden", "Ousama" x "Osama"):
+  // compara letra a letra (pares) e aceita quando é praticamente o mesmo nome
+  const sim = bestSimilarity(tw, qw);
+  if (sim >= 0.8) return Math.round(50 + (sim - 0.8) * 250);
   return 0;
+}
+
+/** Semelhança 0..1 entre duas palavras/frases pelos pares de letras (coeficiente de Dice) */
+function dice(a: string, b: string): number {
+  const A = compact(a);
+  const B = compact(b);
+  if (!A || !B) return 0;
+  if (A === B) return 1;
+  if (A.length < 2 || B.length < 2) return 0;
+  const pairs = new Map<string, number>();
+  for (let i = 0; i < A.length - 1; i++) {
+    const k = A.slice(i, i + 2);
+    pairs.set(k, (pairs.get(k) || 0) + 1);
+  }
+  let hits = 0;
+  for (let i = 0; i < B.length - 1; i++) {
+    const k = B.slice(i, i + 2);
+    const n = pairs.get(k) || 0;
+    if (n > 0) {
+      pairs.set(k, n - 1);
+      hits++;
+    }
+  }
+  return (2 * hits) / (A.length - 1 + (B.length - 1));
+}
+
+/** Melhor semelhança entre a busca e um trecho do título do mesmo tamanho (o resto do título é ruído) */
+function bestSimilarity(titleWords: string[], queryWords: string[]): number {
+  const q = queryWords.join(' ');
+  let best = dice(titleWords.join(' '), q);
+  const n = queryWords.length;
+  for (let size = n; size <= n + 1; size++) {
+    for (let i = 0; i + size <= titleWords.length; i++) {
+      const piece = titleWords.slice(i, i + size).join(' ');
+      const d = dice(piece, q);
+      if (d > best) best = d;
+    }
+  }
+  return best;
 }
 
 /** Melhor nota entre o título e os nomes alternativos */
