@@ -317,6 +317,19 @@ await step('Biblioteca · busca por tags e sem aba Favoritos', async () => {
   return note;
 });
 
+await step('Biblioteca · botão de assistir na capa', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Biblioteca');
+  await sleep(1200);
+  const card = page.locator('div[role=button][title] >> visible=true').first();
+  await card.hover();
+  await sleep(400);
+  const play = await card.locator('button[aria-label^="Assistir agora"]').count();
+  await shot(page, 'biblioteca-assistir');
+  if (!play) throw new Error('a capa não tem o botão de assistir');
+  return 'a capa tem o botão de assistir (continua de onde parou)';
+});
+
 await step('Fontes · instalar addon (Anime Kitsu, só catálogo)', async () => {
   await goTab('Fontes');
   await page.fill('input[aria-label="Link da fonte"]', 'https://anime-kitsu.strem.fun/manifest.json');

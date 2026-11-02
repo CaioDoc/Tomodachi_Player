@@ -23,6 +23,7 @@ const parts: Parts = {
     "{source} didn't return its titles right now. You can open the site and watch from there — the video plays in the app's player.",
     '{source} no devolvió las obras ahora. Puedes abrir el sitio y ver desde allí: el video se reproduce en el reproductor de la app.',
   ],
+  'Assistir agora (continua de onde parou)': ['Watch now (picks up where you left off)', 'Ver ahora (sigue donde lo dejaste)'],
   'Abrir o site': ['Open the site', 'Abrir el sitio'],
   'Catálogo de {label} (pág. {page})': ['{label} catalog (page {page})', 'Catálogo de {label} (pág. {page})'],
   Vídeo: ['Video', 'Video'],

@@ -652,4 +652,6 @@ Revisão completa de Animes & Vídeos com um objetivo: do clique ao vídeo, sem 
 | **Navegador do app** | Os botões de assistir só apareciam em sites de extensões instaladas. | Em **qualquer página de vídeo** o navegador mostra "Assistir no app" e "Episódios no app". |
 | **Mangás** | Só o botão "Ler" abria o capítulo. | Clicar no **nome do capítulo** também abre o leitor, igual aos episódios. |
 
-Testes automáticos novos no Windows: "Assistir" toca o episódio na hora (sem painel); Fontes → "Obras" mostra o catálogo do site dentro do app; addon só de links não mostra "Navegar".
+| **Assistir direto da Biblioteca** | Precisava abrir a obra para começar. | Passando o mouse na capa aparece um **▶**: toca o próximo episódio (ou continua de onde parou) sem sair da Biblioteca. |
+
+Testes automáticos novos no Windows: "Assistir" toca o episódio na hora (sem painel); Fontes → "Obras" mostra o catálogo do site dentro do app; addon só de links não mostra "Navegar"; a capa da Biblioteca tem o botão de assistir.

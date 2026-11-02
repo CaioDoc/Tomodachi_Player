@@ -42,6 +42,7 @@ import {
 } from '../api/extensionRegistry';
 import { loadChapterPages } from '../api/chapterExtractor';
 import { openVideoEpisode } from '../api/openChapter';
+import { quickPlay } from '../api/quickPlay';
 import { FavoriteTagModal } from './FavoriteTagModal';
 import { PROGRESS_EVENT, mergeChapterProgress, updateChapterProgress, getProgressMap } from '../utils/progress';
 import { useIsTabActive } from '../context/TabContext';
@@ -992,6 +993,20 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
                     {unread > 0 && !isCompleted && (
                       <span className="min-w-6 h-5 px-1.5 rounded-md bg-accent text-accent-fg text-[11px] font-semibold tabular-nums inline-flex items-center justify-center shrink-0">{unread}</span>
                     )}
+                    {!isManga && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          quickPlay(item, onOpenTab);
+                        }}
+                        className="p-1.5 rounded-md cursor-pointer shrink-0 text-fg-muted opacity-0 group-hover:opacity-100 hover:text-accent"
+                        title={t('Assistir agora (continua de onde parou)')}
+                        aria-label={t('Assistir agora (continua de onde parou)')}
+                      >
+                        <Play size={14} fill="currentColor" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1082,6 +1097,22 @@ export const MihonLibrary: React.FC<MihonLibraryProps> = ({
                           </span>
                         )}
                       </div>
+                    )}
+
+                    {/* Assistir agora: toca o próximo episódio sem abrir a página da obra */}
+                    {!isManga && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          quickPlay(item, onOpenTab);
+                        }}
+                        className="absolute inset-0 m-auto w-11 h-11 rounded-full bg-accent text-accent-fg shadow-lg inline-flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity z-10 cursor-pointer"
+                        title={t('Assistir agora (continua de onde parou)')}
+                        aria-label={t('Assistir agora (continua de onde parou)')}
+                      >
+                        <Play size={18} fill="currentColor" />
+                      </button>
                     )}
 
                     {/* Favorito / tags */}
