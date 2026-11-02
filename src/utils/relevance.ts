@@ -58,8 +58,11 @@ export function relevance(title: string, query: string): number {
   // Escrito junto/separado ("Full Metal" x "Fullmetal")
   if (compact(t).includes(compact(q)) && q.length >= 4) return 72 - lengthPenalty;
 
-  // Todas as palavras, mas fora de ordem: fraco
-  if (qw.every(matches)) return 58 - lengthPenalty;
+  // Mesmas palavras, só em outra ordem ("Death Note" x "note death"): é a mesma obra
+  const tCore = tw.filter((w) => !STOP.has(w)).sort();
+  if (tCore.length === qw.length && tCore.join(' ') === [...qw].sort().join(' ')) return 70 - lengthPenalty;
+  // Todas as palavras, mas fora de ordem e com outras no meio: fraco (não entra nos resultados)
+  if (qw.every(matches)) return 48 - lengthPenalty;
 
   // Quase igual, escrito de outro jeito ("Shippuden" x "Shippuuden", "Ousama" x "Osama"):
   // compara letra a letra (pares) e aceita quando é praticamente o mesmo nome
