@@ -472,21 +472,23 @@ const AvailableExtensions: React.FC<{ installed: InstalledExtension[]; onOpenTab
             ) : available.length === 0 ? (
               <div className="p-5 text-center text-[12.5px] text-fg-muted">{query ? t('Nada encontrado') : t('Todas as extensões destes repositórios já estão instaladas.')}</div>
             ) : (
-              available.slice(0, 200).map(({ ext, repoUrl }) => (
+              available.slice(0, 200).map(({ ext, repoUrl }) => {
+                const site = siteOf(ext);
+                return (
                 <div key={`${repoUrl}#${ext.pkg || ext.name}`} className="flex items-center gap-3 px-4 py-2">
                   <span className="min-w-0 flex-1">
                     <span className="text-[12.5px] text-fg truncate block">
                       {ext.name.replace(/^Aniyomi:\s*/i, '')}
                       {ext.nsfw && <span className="ml-1.5 text-[9.5px] px-1 rounded bg-danger/15 text-danger-fg">18+</span>}
                     </span>
-                    <span className="text-[10.5px] text-fg-muted font-mono">{[siteOf(ext), ext.lang, ext.versionName || ext.version].filter(Boolean).join(' · ')}</span>
+                    <span className="text-[10.5px] text-fg-muted font-mono">{[site, ext.lang, ext.versionName || ext.version].filter(Boolean).join(' · ')}</span>
                   </span>
                   {/* Espiar o site antes de instalar */}
-                  {!!siteOf(ext) && (
+                  {!!site && (
                     <button
                       type="button"
                       onClick={() => {
-                        const url = `https://${siteOf(ext)}`;
+                        const url = `https://${site}`;
                         const nm = ext.name.replace(/^Aniyomi:\s*/i, '');
                         // Mesmo sem instalar dá para assistir: os botões do navegador tocam no player do app
                         onOpenTab?.('webview', nm, { url, initialUrl: url, videoSource: { name: nm, pkg: ext.pkg || nm } });
@@ -508,7 +510,8 @@ const AvailableExtensions: React.FC<{ installed: InstalledExtension[]; onOpenTab
                     <Download size={12} /> {t('Instalar')}
                   </button>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </>

@@ -128,8 +128,9 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
         const eps = raw.map((c) => ({ url: c.url, name: c.name, number: c.number, read: false, bookmark: false, lastPageRead: 0, lastSecondSeen: 0, lastModifiedAt: Date.now() }));
         const merged = mergeChapterProgress(eps as LibraryChapter[], 'video');
         setEpisodes(merged);
-        // Obra favoritada sem episódios salvos: guarda a lista para abrir na hora da próxima vez
-        if (inLibrary && merged.length) persistRef.current?.(merged);
+        // Obra favoritada sem episódios salvos: guarda a lista lida do site (nunca o episódio avulso
+        // criado quando a página não lista nada) para abrir na hora da próxima vez
+        if (inLibrary && list.length) persistRef.current?.(merged);
       })
       .catch((err) => setEpsError(String(err?.message || err)))
       .finally(() => setLoadingEps(false));

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import type { TabType } from '../types';
 import type { RepoExtension } from '../api/repositories';
-import type { InstalledExtension } from '../api/extensionRegistry';
+import { resolveSourceBaseUrl, type InstalledExtension } from '../api/extensionRegistry';
 import type { LibraryItem } from './MihonLibrary';
 import { getMangaList, getMangaDexCoverUrl, type MangaDexManga } from '../api/mangadex';
 import { FavoriteTagModal } from './FavoriteTagModal';
@@ -186,8 +186,10 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
 
   const extName = extension?.name || extension?.sourceName || t('Extensão');
   const extLang = extension?.lang || 'all';
-  const rawDomain = extension?.baseUrl || '';
+  // Site da extensão: o do repositório ou, se não vier, o do mapa interno de fontes conhecidas
+  const rawDomain = extension?.baseUrl || resolveSourceBaseUrl(extension?.sourceName || extension?.name) || '';
   const extDomain = rawDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const hasSite = !!extDomain;
   const targetWebUrl = rawDomain.startsWith('http') ? rawDomain : `https://${extDomain || 'google.com'}`;
   const isMangaDex = !isVideo && extName.toLowerCase().includes('mangadex');
   const isAtsumaru = !isVideo && (extName.toLowerCase().includes('atsu') || extDomain.includes('atsu'));
@@ -915,7 +917,7 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
           </button>
 
           {/* O site da fonte: dá para navegar nele e assistir no player do app */}
-          {(
+          {hasSite && (
             <button
               type="button"
               onClick={handleOpenWebview}
@@ -1095,8 +1097,21 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                   <span>{t('Carregando catálogo de {source}...', { source: extName })}</span>
                 </div>
               ) : onlineVideos.length === 0 ? (
-                <div className="text-center py-12 text-fg-muted text-xs">
-                  {t('Nenhum título encontrado para "{query}". Tente outro termo de busca ou abra o site oficial na Webview.', { query })}
+                <div className="text-center py-12 space-y-3">
+                  <p className="text-fg-muted text-xs max-w-md mx-auto leading-relaxed">
+                    {query
+                      ? t('Nenhum título encontrado para "{query}" em {source}. Tente outro nome (ex.: em inglês) ou abra o site.', { query, source: extName })
+                      : t('{source} não devolveu as obras agora. Você pode abrir o site e assistir por lá — o vídeo toca no player do app.', { source: extName })}
+                  </p>
+                  {hasSite && (
+                    <button
+                      type="button"
+                      onClick={handleOpenWebview}
+                      className="h-8 px-3 rounded-md bg-accent hover:bg-accent-hover text-accent-fg text-[12px] font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Globe size={13} /> {t('Abrir o site')}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

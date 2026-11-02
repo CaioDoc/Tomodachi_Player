@@ -15,6 +15,14 @@ const parts: Parts = {
   'Ver as obras deste site dentro do app': ["See this site's titles inside the app", 'Ver las obras de este sitio dentro de la app'],
   Obras: ['Titles', 'Obras'],
   'Ver o site antes de instalar': ['See the site before installing', 'Ver el sitio antes de instalar'],
+  'Nenhum título encontrado para "{query}" em {source}. Tente outro nome (ex.: em inglês) ou abra o site.': [
+    'No title found for "{query}" on {source}. Try another name (English, for example) or open the site.',
+    'Ningún título encontrado para "{query}" en {source}. Prueba otro nombre (en inglés, por ejemplo) o abre el sitio.',
+  ],
+  '{source} não devolveu as obras agora. Você pode abrir o site e assistir por lá — o vídeo toca no player do app.': [
+    "{source} didn't return its titles right now. You can open the site and watch from there — the video plays in the app's player.",
+    '{source} no devolvió las obras ahora. Puedes abrir el sitio y ver desde allí: el video se reproduce en el reproductor de la app.',
+  ],
   'Abrir o site': ['Open the site', 'Abrir el sitio'],
   'Catálogo de {label} (pág. {page})': ['{label} catalog (page {page})', 'Catálogo de {label} (pág. {page})'],
   Vídeo: ['Video', 'Video'],
