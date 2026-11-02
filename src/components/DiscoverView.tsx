@@ -7,6 +7,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, SearchX, X, Sparkles, Tv, Film, Puzzle } from 'lucide-react';
 import { AniListBrowser } from './AniListBrowser';
 import { Catalog } from './NuvioView';
+import { ExtensionCatalogView } from './ExtensionCatalogView';
+import { getAnimeSources, type InstalledExtension } from '../api/extensionRegistry';
+import { addonCatalogs } from '../api/nuvio';
 import { ContinueWatching } from './ContinueWatching';
 import { SearchResults, type SearchResultsStatus } from './SearchResults';
 import { NUVIO_EVENT } from '../api/nuvio';
@@ -21,6 +24,16 @@ type OpenTabFn = (typeOrTab: any, title?: string, data?: any) => void;
 type Kind = 'anilist' | 'series' | 'movie';
 
 const SOURCE_KEY = 'tp_discover_source';
+/** Onde buscar: todas as fontes ou uma só (extensão ou catálogo de addon) */
+const WHERE_KEY = 'tp_discover_where';
+
+const readWhere = () => {
+  try {
+    return localStorage.getItem(WHERE_KEY) || 'all';
+  } catch {
+    return 'all';
+  }
+};
 
 const readKind = (): Kind => {
   try {
@@ -36,6 +49,21 @@ export const DiscoverView: React.FC<{
   onGoToSources: () => void;
 }> = ({ onOpenTab, onGoToSources }) => {
   const [kind, setKindState] = useState<Kind>(readKind);
+  // Fonte escolhida no seletor ao lado da busca ("Todas" procura em tudo de uma vez)
+  const [where, setWhereState] = useState<string>(readWhere);
+  const [sourceList, setSourceList] = useState<{ exts: InstalledExtension[]; catalogs: ReturnType<typeof addonCatalogs> }>(() => ({ exts: getAnimeSources(), catalogs: addonCatalogs() }));
+  const setWhere = (v: string) => {
+    setWhereState(v);
+    try {
+      localStorage.setItem(WHERE_KEY, v);
+    } catch {
+      /* ignore */
+    }
+  };
+  const pickedExt = where.startsWith('site:') ? sourceList.exts.find((e) => e.pkg === where.slice(5)) : undefined;
+  const pickedCatalog = where.startsWith('addon:') ? sourceList.catalogs.find((c) => c.key === where.slice(6)) : undefined;
+  // Fonte removida: volta para "Todas"
+  const oneSource = where !== 'all' && (pickedExt || pickedCatalog) ? where : 'all';
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
   const [counts, setCounts] = useState(videoSourceCounts);
@@ -55,7 +83,10 @@ export const DiscoverView: React.FC<{
   };
 
   useEffect(() => {
-    const refresh = () => setCounts(videoSourceCounts());
+    const refresh = () => {
+      setCounts(videoSourceCounts());
+      setSourceList({ exts: getAnimeSources(), catalogs: addonCatalogs() });
+    };
     window.addEventListener('extensions:updated', refresh);
     window.addEventListener(NUVIO_EVENT, refresh);
     window.addEventListener('storage', refresh);
@@ -118,10 +149,12 @@ export const DiscoverView: React.FC<{
     return () => clearTimeout(id);
   }, [input]);
 
-  const placeholder = useMemo(
-    () => (kind === 'series' ? t('Buscar séries… (ex.: Crime, Drama)') : kind === 'movie' ? t('Buscar filmes… (ex.: Terror, Mistério)') : t('Buscar animes… (ex.: Seinen, Monster)')),
-    [kind]
-  );
+  const placeholder = useMemo(() => {
+    const one = pickedExt?.name || pickedCatalog?.addon.name;
+    if (oneSource !== 'all' && one) return t('Buscar em {name}…', { name: one });
+    return kind === 'series' ? t('Buscar séries… (ex.: Crime, Drama)') : kind === 'movie' ? t('Buscar filmes… (ex.: Terror, Mistério)') : t('Buscar animes… (ex.: Seinen, Monster)');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, oneSource, pickedExt?.name, pickedCatalog?.key]);
 
   const kinds: [Kind, string, React.ReactNode][] = [
     ['anilist', t('Animes'), <Sparkles key="a" size={13} />],
@@ -132,7 +165,36 @@ export const DiscoverView: React.FC<{
   return (
     <div className="flex flex-col h-full min-h-0 bg-canvas">
       <div className="px-4 py-3 border-b border-line-subtle bg-surface flex-shrink-0 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[220px] max-w-2xl">
+        {/* Onde buscar: todas as fontes de uma vez, ou uma só (como em Mangás & Comics) */}
+        <div className="flex items-stretch flex-1 min-w-[260px] max-w-3xl">
+          <select
+            value={oneSource}
+            onChange={(e) => setWhere(e.target.value)}
+            aria-label={t('Onde buscar')}
+            title={t('Escolha onde buscar')}
+            className="h-10 max-w-[190px] bg-subtle border border-line border-r-0 rounded-l-lg px-2.5 text-[12.5px] text-fg outline-none cursor-pointer focus:border-accent"
+          >
+            <option value="all">{t('Todas as fontes')}</option>
+            {sourceList.exts.length > 0 && (
+              <optgroup label={t('Extensões')}>
+                {sourceList.exts.map((e) => (
+                  <option key={e.pkg} value={`site:${e.pkg}`}>
+                    {e.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {sourceList.catalogs.length > 0 && (
+              <optgroup label={t('Addons')}>
+                {sourceList.catalogs.map((c) => (
+                  <option key={c.key} value={`addon:${c.key}`}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          <div className="relative flex-1 min-w-0">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted" />
           <input
             ref={inputRef}
@@ -144,7 +206,7 @@ export const DiscoverView: React.FC<{
             }}
             placeholder={placeholder}
             aria-label={placeholder}
-            className="w-full h-10 bg-canvas border border-line focus:border-accent rounded-lg pl-10 pr-9 text-[13.5px] text-fg outline-none"
+            className="w-full h-10 bg-canvas border border-line focus:border-accent rounded-r-lg pl-10 pr-9 text-[13.5px] text-fg outline-none"
           />
           {input && (
             <button
@@ -160,8 +222,10 @@ export const DiscoverView: React.FC<{
               <X size={14} />
             </button>
           )}
+          </div>
         </div>
 
+        {oneSource === 'all' && (
         <div role="tablist" aria-label={t('Catálogos')} className="inline-flex p-1 rounded-lg bg-canvas border border-line-subtle shrink-0">
           {kinds.map(([k, label, icon]) => (
             <button
@@ -179,6 +243,7 @@ export const DiscoverView: React.FC<{
             </button>
           ))}
         </div>
+        )}
 
         <div ref={setActionsEl} className="flex items-center gap-2 shrink-0" />
 
@@ -227,6 +292,16 @@ export const DiscoverView: React.FC<{
         </div>
       )}
 
+      {oneSource !== 'all' ? (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {pickedExt ? (
+            <ExtensionCatalogView key={pickedExt.pkg} extension={pickedExt} mediaType="video" externalQuery={query} onOpenTab={onOpenTab} />
+          ) : pickedCatalog ? (
+            <Catalog key={pickedCatalog.key} onOpenTab={onOpenTab} embedded={{ sourceKey: pickedCatalog.key, query }} />
+          ) : null}
+        </div>
+      ) : (
+        <>
       {searchMode && <SearchResults query={sourcesQuery} genres={filterTerms} kind={kind} onOpenTab={onOpenTab} onStatus={setSrcStatus} />}
 
       {!query && <ContinueWatching onOpenTab={onOpenTab} />}
@@ -293,6 +368,8 @@ export const DiscoverView: React.FC<{
           <Catalog key={kind} onOpenTab={onOpenTab} embedded={{ kind, query: searchMode ? '' : query }} actionsTarget={actionsEl} />
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };

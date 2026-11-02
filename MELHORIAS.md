@@ -655,3 +655,14 @@ Revisão completa de Animes & Vídeos com um objetivo: do clique ao vídeo, sem 
 | **Assistir direto da Biblioteca** | Precisava abrir a obra para começar. | Passando o mouse na capa aparece um **▶**: toca o próximo episódio (ou continua de onde parou) sem sair da Biblioteca. |
 
 Testes automáticos novos no Windows: "Assistir" toca o episódio na hora (sem painel); Fontes → "Obras" mostra o catálogo do site dentro do app; addon só de links não mostra "Navegar"; a capa da Biblioteca tem o botão de assistir.
+
+## Escolher onde buscar, como em Mangás & Comics (1.9.0-beta)
+
+A busca de **Animes & Vídeos** ganhou um seletor colado ao campo, igual ao que Mangás & Comics faz com as fontes:
+
+- **Todas as fontes** (padrão): busca ao mesmo tempo em todas as extensões instaladas, nos plugins e nos addons, e junta tudo numa lista só, ordenada pelo que mais bate com o texto — exatamente como era antes.
+- **Uma fonte só**: escolhendo uma extensão ou um catálogo de addon, o Descobrir passa a mostrar o catálogo daquela fonte e a busca do campo acontece **dentro dela** (a busca do próprio site, no caso das extensões).
+- A escolha fica salva para a próxima vez. Fontes sem catálogo próprio (plugins e addons só de links) não aparecem na lista: elas continuam entrando na opção "Todas as fontes".
+- O texto do campo acompanha a escolha ("Buscar em Anime Fire…").
+
+Teste automático novo: o seletor tem "Todas as fontes" e as extensões instaladas; escolher uma abre o catálogo dela e a busca encontra a obra ali dentro.

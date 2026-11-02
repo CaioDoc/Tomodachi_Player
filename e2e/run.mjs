@@ -620,6 +620,35 @@ await step('Fontes · "Obras" mostra o catálogo do site dentro do app', async (
   return `catálogo aberto no app (${covers} capas, ${cards} blocos) com o botão para abrir o site`;
 });
 
+await step('Descobrir · seletor de onde buscar (uma fonte ou todas)', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  await sleep(800);
+  const sel = page.locator('select[aria-label="Onde buscar"] >> visible=true').first();
+  await sel.waitFor({ timeout: 15000 });
+  const options = (await sel.locator('option').allInnerTexts()).map((x) => x.trim());
+  if (options[0] !== 'Todas as fontes') throw new Error('falta a opção "Todas as fontes": ' + options.join(' | '));
+  if (!options.some((o) => /Site Teste/.test(o))) throw new Error('a extensão não aparece no seletor: ' + options.join(' | '));
+  // Uma fonte só: mostra o catálogo dela e a busca acontece dentro dela
+  await sel.selectOption('site:test.site');
+  await sleep(3000);
+  await shot(page, 'descobrir-fonte-unica');
+  const header = await page.locator('h2:has-text("Site Teste") >> visible=true').count();
+  const input = page.locator('input[placeholder*="Site Teste"] >> visible=true').first();
+  await input.fill('Tomodachi');
+  await sleep(6000);
+  await shot(page, 'descobrir-fonte-unica-busca');
+  const found = await page.locator('text=Tomodachi Teste Dublado >> visible=true').count();
+  await input.fill('');
+  await sel.selectOption('all');
+  await sleep(1500);
+  const back = await page.locator('[aria-label="Catálogos"] >> visible=true').count();
+  if (!header) throw new Error('não abriu o catálogo da fonte escolhida');
+  if (!found) throw new Error('a busca na fonte escolhida não achou a obra');
+  if (!back) throw new Error('não voltou para "Todas as fontes"');
+  return `${options.length} opções (${options.slice(0, 3).join(', ')}…); busca dentro da fonte achou a obra`;
+});
+
 await step('Configurações · cartão do MyAnimeList', async () => {
   await goSection('Configurações');
   await sleep(1000);
