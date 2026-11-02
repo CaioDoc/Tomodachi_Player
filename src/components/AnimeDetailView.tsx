@@ -69,9 +69,12 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
   const [, setPosTick] = useState(0);
 
   // Sempre busca a versão mais recente salva na biblioteca (a aba pode ter sido restaurada)
+  // Só procura episódios no site depois de saber o que a biblioteca já tem
+  const [libChecked, setLibChecked] = useState(false);
   const reload = useCallback(async () => {
     if (!initial?.url) return;
     const lib = await readLibrary('video');
+    setLibChecked(true);
     const found = (lib.entries || []).find((e: any) => e?.url === initial.url) as LibraryItem | undefined;
     setInLibrary(!!found);
     if (found) {
@@ -106,12 +109,12 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
     };
   }, [reload]);
 
-  // Obra aberta fora da biblioteca (catálogo de um site): carrega a lista de episódios do site
+  // Obra de um site (da biblioteca ou não): se ainda não há episódios, lê a lista no próprio site
   const [loadingEps, setLoadingEps] = useState(false);
   const [epsError, setEpsError] = useState<string | null>(null);
   const triedEps = React.useRef(false);
   useEffect(() => {
-    if (triedEps.current || inLibrary || episodes.length > 0) return;
+    if (triedEps.current || !libChecked || episodes.length > 0) return;
     const url = String(anime?.url || '');
     if (!/^https?:\/\//i.test(url) || /anilist\.co/i.test(url)) return;
     triedEps.current = true;
@@ -120,13 +123,19 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
     // Leitor próprio de episódios de sites de vídeo (número e nome curtos e certos)
     videoEpisodes(url, anime.sourceName || '')
       .then((list) => {
-        const eps = list.map((c) => ({ url: c.url, name: c.name, number: c.number, read: false, bookmark: false, lastPageRead: 0, lastSecondSeen: 0, lastModifiedAt: Date.now() }));
-        setEpisodes(mergeChapterProgress(eps as LibraryChapter[], 'video'));
+        // Página sem lista de episódios (filme, OVA, vídeo único): a própria página é o "episódio 1"
+        const raw = list.length ? list : [{ url, name: t('Assistir'), number: 1 }];
+        const eps = raw.map((c) => ({ url: c.url, name: c.name, number: c.number, read: false, bookmark: false, lastPageRead: 0, lastSecondSeen: 0, lastModifiedAt: Date.now() }));
+        const merged = mergeChapterProgress(eps as LibraryChapter[], 'video');
+        setEpisodes(merged);
+        // Obra favoritada sem episódios salvos: guarda a lista para abrir na hora da próxima vez
+        if (inLibrary && merged.length) persistRef.current?.(merged);
       })
       .catch((err) => setEpsError(String(err?.message || err)))
       .finally(() => setLoadingEps(false));
-  }, [inLibrary, episodes.length, anime?.url, anime?.sourceName]);
+  }, [libChecked, inLibrary, episodes.length, anime?.url, anime?.sourceName]);
 
+  const persistRef = React.useRef<((next: LibraryChapter[]) => void) | null>(null);
   const persist = useCallback(
     (next: LibraryChapter[]) => {
       void updateLibrary('video', (entries) =>
@@ -135,6 +144,7 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
     },
     [anime.url]
   );
+  persistRef.current = persist;
 
   const setWatched = (urls: string[], read: boolean) => {
     const set = new Set(urls);
@@ -176,8 +186,9 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
   const work = { url: anime.url, title: anime.title, sourceName: anime.sourceName, source: anime.source, chapters: sortedAsc };
 
   // Painel de Fontes (extensões + plugins do Nuvio) para este episódio
-  const openSources = (ep?: LibraryChapter | null) =>
+  const openSources = (ep?: LibraryChapter | null, autoPlay = false) =>
     openWatchSources({
+      autoPlay,
       title: anime.title,
       altTitles: anime.altTitles,
       year: anime.year,
@@ -189,8 +200,10 @@ export const AnimeDetailView: React.FC<AnimeDetailViewProps> = ({ anime: initial
       episodeUrls: Object.fromEntries(episodes.filter((c) => c.number > 0).map((c) => [String(c.number), c.url])),
       preferred: anime.sourceName && !/anilist/i.test(anime.sourceName) ? { extName: anime.sourceName, url: /^https?:\/\//.test(anime.url) && !/anilist\.co/i.test(anime.url) ? anime.url : undefined } : undefined,
     });
-  // Arquivos locais tocam direto; o resto abre "Onde assistir" (o usuário escolhe a fonte)
-  const play = (ep: LibraryChapter) => (isLocalPath(ep.url || '') ? openVideoEpisode(work, ep, onOpenTab) : openSources(ep));
+  // Episódio com link de verdade (arquivo local ou página de um site): toca na hora, no player do app.
+  // Sem link próprio (obra só do AniList): procura sozinho em todas as fontes e toca a primeira que responder.
+  const playable = (url: string) => isLocalPath(url) || (/^https?:\/\//i.test(url) && !/anilist\.co/i.test(url));
+  const play = (ep: LibraryChapter) => (playable(ep.url || '') ? openVideoEpisode(work, ep, onOpenTab) : openSources(ep, true));
   // Continuar: reabre o mesmo vídeo (mesma fonte) no ponto salvo; sem registro, abre "Onde assistir"
   const resumeOrPlay = (ep: LibraryChapter) => {
     const r = isLocalPath(ep.url || '') ? null : getResume(ep.url);

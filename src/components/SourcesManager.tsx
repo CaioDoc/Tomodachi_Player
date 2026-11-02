@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import {
   NUVIO_EVENT,
+  addonCatalogs,
   getNuvioState,
   importNuvioJson,
   isScraperEnabled,
@@ -40,7 +41,7 @@ import {
   type StremioAddon,
 } from '../api/nuvio';
 import { addAnySource, availableAnimeExtensions, installAnimeExtension, refreshAllVideoSources, removeAnimeExtRepo } from '../api/sources';
-import { getInstalledExtensions, removeExtension, type InstalledExtension } from '../api/extensionRegistry';
+import { getInstalledExtensions, removeExtension, resolveSourceBaseUrl, type InstalledExtension } from '../api/extensionRegistry';
 import { loadRepos } from '../api/reposStore';
 import type { RepoExtension } from '../api/repositories';
 import { Toggle } from './NuvioView';
@@ -214,7 +215,7 @@ const AddSource: React.FC = () => {
       </div>
       <div className="px-5 py-2.5 border-t border-line-subtle text-[11.5px] text-fg-muted flex items-center gap-2">
         <Sparkles size={13} className="text-accent shrink-0" />
-        {t('Não importa o tipo: ao clicar em Assistir, o app procura em todas as fontes ligadas e junta os links numa lista só.')}
+        {t('Não importa o tipo: ao clicar em Assistir, o app procura em todas as fontes ligadas e toca a primeira que responder — sempre aqui dentro.')}
       </div>
     </section>
   );
@@ -235,12 +236,14 @@ const BrowseBtn: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   </button>
 );
 
-const ExtensionRow: React.FC<{ ext: InstalledExtension; onBrowse: (ext: InstalledExtension) => void }> = ({ ext, onBrowse }) => {
-  const domain = String(ext.baseUrl || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+const ExtensionRow: React.FC<{ ext: InstalledExtension; onBrowse: (ext: InstalledExtension) => void; onOpenTab?: OpenTabFn }> = ({ ext, onBrowse, onOpenTab }) => {
+  const domain = String(ext.baseUrl || resolveSourceBaseUrl(ext.sourceName || ext.name) || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  // Catálogo do site dentro do app (capas e títulos do próprio site, em grade)
+  const openCatalog = () => onOpenTab?.('extension-catalog', ext.name, { extension: ext, mediaType: 'video' });
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <IconBox kind="ext" src={ext.icon} />
-      <div className="min-w-0 flex-1">
+      <button type="button" onClick={openCatalog} className="min-w-0 flex-1 text-left cursor-pointer" title={t('Ver as obras deste site dentro do app')}>
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[13px] font-semibold text-fg truncate">{ext.name}</span>
           <KindBadge kind="ext" />
@@ -248,8 +251,17 @@ const ExtensionRow: React.FC<{ ext: InstalledExtension; onBrowse: (ext: Installe
         <div className="text-[11.5px] text-fg-muted truncate">
           {[domain, ext.lang?.toUpperCase(), ext.version ? `v${ext.version}` : ''].filter(Boolean).join(' · ')}
         </div>
-      </div>
-      <BrowseBtn onClick={() => onBrowse(ext)} />
+      </button>
+      <button
+        type="button"
+        onClick={openCatalog}
+        className="h-8 px-3 rounded-md bg-subtle hover:bg-elevated border border-line-subtle text-[12px] text-fg inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+        title={t('Ver as obras deste site dentro do app')}
+      >
+        <Sparkles size={13} /> {t('Obras')}
+      </button>
+      {/* Sem site conhecido não há o que navegar: o botão nem aparece */}
+      {!!domain && <BrowseBtn onClick={() => onBrowse(ext)} />}
       <IconBtn
         danger
         title={t('Remover extensão')}
@@ -287,7 +299,6 @@ const PluginRepoRow: React.FC<{ repo: NuvioRepo; state: ReturnType<typeof getNuv
             {repo.author ? ` · ${repo.author}` : ''}
           </div>
         </button>
-        <BrowseBtn onClick={() => onOpenTab?.('source-browse', repo.name, { target: { kind: 'plugin', url: repo.url, name: repo.name } })} />
         <Toggle on={on > 0} onChange={(v) => setRepoScrapersEnabled(repo.url, v)} label={on > 0 ? t('Desativar {name}', { name: repo.name }) : t('Ativar {name}', { name: repo.name })} />
         <IconBtn
           danger
@@ -328,6 +339,7 @@ const PluginRepoRow: React.FC<{ repo: NuvioRepo; state: ReturnType<typeof getNuv
 };
 
 const AddonRow: React.FC<{ addon: StremioAddon; onOpenTab?: OpenTabFn }> = ({ addon: a, onOpenTab }) => {
+  const canBrowseAddon = useMemo(() => addonCatalogs().some((c) => c.addon.url === a.url), [a.url, a.enabled, a.catalogs]);
   const res = a.resources.map((r) => (r.name === 'stream' ? t('links') : r.name === 'catalog' ? t('catálogo') : r.name === 'meta' ? t('detalhes') : r.name === 'subtitles' ? t('legendas') : r.name));
   return (
     <div className="flex items-center gap-3 px-4 py-3">
@@ -347,7 +359,8 @@ const AddonRow: React.FC<{ addon: StremioAddon; onOpenTab?: OpenTabFn }> = ({ ad
           {a.version ? ` · v${a.version}` : ''}
         </div>
       </div>
-      <BrowseBtn onClick={() => onOpenTab?.('source-browse', a.name, { target: { kind: 'addon', url: a.url, name: a.name } })} />
+      {/* Addon só de links (sem catálogo): não há o que navegar */}
+      {canBrowseAddon && <BrowseBtn onClick={() => onOpenTab?.('source-browse', a.name, { target: { kind: 'addon', url: a.url, name: a.name } })} />}
       <IconBtn
         title={t('Copiar link do addon')}
         onClick={() => {
@@ -374,7 +387,13 @@ const AddonRow: React.FC<{ addon: StremioAddon; onOpenTab?: OpenTabFn }> = ({ ad
 
 /* ───────────────────────── Extensões para instalar ───────────────────────── */
 
-const AvailableExtensions: React.FC<{ installed: InstalledExtension[] }> = ({ installed }) => {
+/** Site da extensão (do repositório ou do mapa interno): sem ele não dá para navegar */
+const siteOf = (e: RepoExtension) =>
+  String(e.baseUrl || e.sources?.[0]?.baseUrl || resolveSourceBaseUrl(e.sources?.[0]?.name || e.name.replace(/^Aniyomi:\s*/i, '')) || '')
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '');
+
+const AvailableExtensions: React.FC<{ installed: InstalledExtension[]; onOpenTab?: OpenTabFn }> = ({ installed, onOpenTab }) => {
   const [repos, setRepos] = useState(() => loadRepos('anime'));
   const [items, setItems] = useState<{ repoUrl: string; repoLabel: string; ext: RepoExtension }[] | null>(null);
   const [query, setQuery] = useState('');
@@ -460,8 +479,24 @@ const AvailableExtensions: React.FC<{ installed: InstalledExtension[] }> = ({ in
                       {ext.name.replace(/^Aniyomi:\s*/i, '')}
                       {ext.nsfw && <span className="ml-1.5 text-[9.5px] px-1 rounded bg-danger/15 text-danger-fg">18+</span>}
                     </span>
-                    <span className="text-[10.5px] text-fg-muted font-mono">{[ext.lang, ext.versionName || ext.version].filter(Boolean).join(' · ')}</span>
+                    <span className="text-[10.5px] text-fg-muted font-mono">{[siteOf(ext), ext.lang, ext.versionName || ext.version].filter(Boolean).join(' · ')}</span>
                   </span>
+                  {/* Espiar o site antes de instalar */}
+                  {!!siteOf(ext) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `https://${siteOf(ext)}`;
+                        const nm = ext.name.replace(/^Aniyomi:\s*/i, '');
+                        // Mesmo sem instalar dá para assistir: os botões do navegador tocam no player do app
+                        onOpenTab?.('webview', nm, { url, initialUrl: url, videoSource: { name: nm, pkg: ext.pkg || nm } });
+                      }}
+                      title={t('Ver o site antes de instalar')}
+                      className="h-7 px-2.5 rounded-md bg-subtle hover:bg-elevated border border-line-subtle text-[11.5px] text-fg inline-flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      <Compass size={12} /> {t('Navegar')}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -581,7 +616,7 @@ export const SourcesManager: React.FC<{ onOpenTab?: OpenTabFn }> = ({ onOpenTab 
             </div>
           ) : (
             <div className="rounded-xl border border-line bg-surface divide-y divide-line-subtle overflow-hidden">
-              {(filter === 'all' || filter === 'ext') && installed.map((e) => <ExtensionRow key={e.pkg} ext={e} onBrowse={onBrowseExtension} />)}
+              {(filter === 'all' || filter === 'ext') && installed.map((e) => <ExtensionRow key={e.pkg} ext={e} onBrowse={onBrowseExtension} onOpenTab={onOpenTab} />)}
               {(filter === 'all' || filter === 'plugin') && state.repos.map((r) => <PluginRepoRow key={r.url} repo={r} state={state} onOpenTab={onOpenTab} />)}
               {(filter === 'all' || filter === 'addon') && state.addons.map((a) => <AddonRow key={a.url} addon={a} onOpenTab={onOpenTab} />)}
               {filter !== 'all' && counts[filter] === 0 && <div className="p-6 text-center text-[12.5px] text-fg-muted">{t('Nada deste tipo instalado.')}</div>}
@@ -589,7 +624,7 @@ export const SourcesManager: React.FC<{ onOpenTab?: OpenTabFn }> = ({ onOpenTab 
           )}
         </section>
 
-        <AvailableExtensions installed={installed} />
+        <AvailableExtensions installed={installed} onOpenTab={onOpenTab} />
 
         <div className="flex items-start gap-2 text-[11.5px] text-fg-muted pb-4">
           <ShieldCheck size={14} className="shrink-0 mt-0.5 text-success" />

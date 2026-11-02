@@ -371,7 +371,11 @@ await step('Fontes · addon só de links (Torrentio) entra na busca', async () =
   await page.fill('input[aria-label="Link da fonte"]', 'https://torrentio.strem.fun/manifest.json');
   await page.keyboard.press('Enter');
   await page.locator('text=/Addon instalado/').first().waitFor({ timeout: 45000 });
-  await sleep(800);
+  await sleep(1200);
+  // Addon só de links não tem catálogo para navegar: o botão não pode aparecer na linha dele
+  const torrRow = page.locator('div.flex.items-center.gap-3:has(span:text-is("Torrentio"))').first();
+  const torrBrowse = await torrRow.locator('button:has-text("Navegar")').count();
+  if (torrBrowse) throw new Error('addon só de links não deveria ter o botão Navegar');
   await goTab('Descobrir');
   await visible(page, '[aria-label="Catálogos"] [role=tab]:has-text("Animes")').first().click();
   await sleep(500);
@@ -387,7 +391,7 @@ await step('Fontes · addon só de links (Torrentio) entra na busca', async () =
   if (titles[0] !== 'Breaking Bad') throw new Error('o 1º resultado não é "Breaking Bad": ' + titles.slice(0, 4).join(' | '));
   const junk = titles.filter((x) => /bad guys|hockey|bad news bears/i.test(x));
   if (junk.length) throw new Error('resultados que não batem com a busca: ' + junk.join(' | '));
-  return `${titles.length} obras, na ordem: ${titles.slice(0, 5).join(' | ')}`;
+  return `${titles.length} obras, na ordem: ${titles.slice(0, 5).join(' | ')}; sem botão Navegar (só links)`;
 });
 
 await step('Descobrir · nada encontrado mostra um aviso só', async () => {
@@ -477,7 +481,8 @@ await step('Extensão (site) · acha a obra pela busca do site e toca o episódi
   await page.locator('section[aria-label="Resultados nas suas fontes"] div.group > button:first-child >> visible=true').first().click();
   await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, tabsBefore, { timeout: 30000 });
   await sleep(2500);
-  await visible(page, 'button:has-text("Assistir")').first().click();
+  // "Onde assistir": lista todas as fontes (o botão "Assistir" agora toca direto, testado abaixo)
+  await visible(page, 'button:has-text("Onde assistir")').first().click();
   const playEp = page.locator('[role=dialog] button:has-text("Assistir episódio 1") >> visible=true').first();
   await playEp.waitFor({ timeout: 60000 });
   await sleep(1500);
@@ -519,6 +524,40 @@ await step('Extensão (site) · acha a obra pela busca do site e toca o episódi
   return `${switches} sites com liga/desliga; episódios ${epButtons.join(',')}; tocou em ${secs}s pelo player do app (${String(info?.src).slice(0, 60)})`;
 });
 
+await step('Extensão · "Assistir" toca o episódio na hora (sem passar pelo painel)', async () => {
+  // O teste do usuário: achou a obra numa extensão, clicou em assistir e o vídeo toca
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('Tomodachi Teste');
+  await page.locator('section[aria-label="Resultados nas suas fontes"] >> text=Site Teste').first().waitFor({ timeout: 45000 });
+  await waitSearchDone();
+  const tabsBefore = await page.locator('[draggable=true]').count();
+  await page.locator('section[aria-label="Resultados nas suas fontes"] div.group > button:first-child >> visible=true').first().click();
+  await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, tabsBefore, { timeout: 30000 });
+  await sleep(2500);
+  const t0 = Date.now();
+  await visible(page, 'button:has-text("Assistir:")').first().click();
+  await sleep(1200);
+  const drawer = await page.locator('[role=dialog] >> visible=true').count();
+  await page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.offsetParent && v.currentTime > 1), null, { timeout: 60000 });
+  const secs = ((Date.now() - t0) / 1000).toFixed(1);
+  const src = await page.evaluate(() => [...document.querySelectorAll('video')].find((v) => v.offsetParent)?.currentSrc || '');
+  await shot(page, 'assistir-direto');
+  const webviews = await page.locator('webview').count();
+  await page.keyboard.press('Control+w').catch(() => {});
+  await sleep(600);
+  await page.keyboard.press('Control+w').catch(() => {});
+  await sleep(600);
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  await page.locator('input[placeholder*="ex."] >> visible=true').first().fill('');
+  if (drawer) throw new Error('abriu o painel de fontes em vez de tocar');
+  if (webviews) throw new Error('abriu o site num navegador');
+  if (!/sample\.mp4/.test(src)) throw new Error('tocou outra coisa: ' + src);
+  return `tocou em ${secs}s direto do botão Assistir (sem painel)`;
+});
+
 await step('Fontes · Browse abre o site com "Assistir no app"', async () => {
   await page.evaluate(() => localStorage.removeItem('tp_watch_ext_off'));
   await goSection('Animes & Vídeos');
@@ -539,6 +578,27 @@ await step('Fontes · Browse abre o site com "Assistir no app"', async () => {
   if (!webviews) throw new Error('Browse não mostrou a página do site');
   if (!watchBtn || !epsBtn) throw new Error('faltam os botões para assistir no app');
   return 'abriu a página do site com "Assistir no app" e "Episódios no app"';
+});
+
+await step('Fontes · "Obras" mostra o catálogo do site dentro do app', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Fontes');
+  await sleep(1200);
+  const tabsBefore = await page.locator('[draggable=true]').count();
+  const row = page.locator('div.flex.items-center.gap-3:has(span:text-is("Site Teste"))').first();
+  await row.locator('button:has-text("Obras")').first().click();
+  await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, tabsBefore, { timeout: 20000 });
+  await sleep(4000);
+  await shot(page, 'fontes-obras');
+  const site = await page.locator('button:has-text("Abrir o site") >> visible=true').count();
+  const cards = await page.locator('[role=button], .group').filter({ hasNotText: '' }).count();
+  const covers = await page.locator('img[loading=lazy] >> visible=true').count();
+  const webviews = await page.locator('webview').count();
+  await page.keyboard.press('Control+w').catch(() => {});
+  await sleep(600);
+  if (webviews) throw new Error('"Obras" abriu o site em vez do catálogo do app');
+  if (!site) throw new Error('falta o botão "Abrir o site" no catálogo');
+  return `catálogo aberto no app (${covers} capas, ${cards} blocos) com o botão para abrir o site`;
 });
 
 await step('Configurações · cartão do MyAnimeList', async () => {

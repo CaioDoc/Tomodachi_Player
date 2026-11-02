@@ -199,6 +199,8 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
 
   // Perfil específico de catálogo e paginação para extensões de vídeo
   const videoProfile = useMemo(() => getVideoProfile(extName, extLang), [extName, extLang]);
+  /** As obras vieram do próprio site da extensão (e não do catálogo do AniList) */
+  const [fromSiteCatalog, setFromSiteCatalog] = useState(false);
   const [catalogPage, setCatalogPage] = useState<number>(1);
   const [refreshNonce, setRefreshNonce] = useState<number>(0);
 
@@ -595,8 +597,10 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                 ],
                 url: it.url,
               }));
+              setFromSiteCatalog(true);
               setOnlineVideos(mapped);
             } else {
+              setFromSiteCatalog(false);
               setOnlineVideos([]);
             }
           })
@@ -670,6 +674,7 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
       })
         .then((res) => res.json())
         .then((json) => {
+          setFromSiteCatalog(false);
           setOnlineVideos(json.data?.Page?.media || []);
         })
         .catch(() => setOnlineVideos([]))
@@ -792,6 +797,8 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
     onOpenTab?.('webview', extName, {
       url: targetWebUrl,
       initialUrl: targetWebUrl,
+      // Site de vídeo: a barra do navegador ganha "Assistir no app" e "Episódios no app"
+      ...(isVideo ? { videoSource: { name: extName, pkg: extension?.pkg || extName } } : {}),
     });
   };
 
@@ -907,8 +914,8 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
             </span>
           </button>
 
-          {/* Vídeos tocam sempre no player do app: o site da fonte só aparece para mangás */}
-          {!isVideo && (
+          {/* O site da fonte: dá para navegar nele e assistir no player do app */}
+          {(
             <button
               type="button"
               onClick={handleOpenWebview}
@@ -916,7 +923,7 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
               title={t('Abrir website oficial na Webview interna')}
             >
               <Globe size={13} />
-              <span className="hidden sm:inline">Webview</span>
+              <span className="hidden sm:inline">{isVideo ? t('Abrir o site') : 'Webview'}</span>
             </button>
           )}
         </div>
@@ -1048,7 +1055,7 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                     <span>
                       {debouncedQuery
                         ? t('Resultados da busca online para "{query}"', { query: debouncedQuery })
-                        : t('Catálogo online: {label} (pág. {page})', { label: videoProfile.label, page: catalogPage })}
+                        : t('Catálogo de {label} (pág. {page})', { label: fromSiteCatalog ? extName : videoProfile.label, page: catalogPage })}
                     </span>
                   </h3>
 

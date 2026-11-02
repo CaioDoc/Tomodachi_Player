@@ -935,7 +935,8 @@ export const MangaDetailView: React.FC<MangaDetailViewProps> = ({
                           <Circle size={16} />
                         )}
                       </button>
-                      <div className="min-w-0">
+                      {/* Clicar no nome do capítulo já abre o leitor (igual aos episódios) */}
+                      <button type="button" onClick={() => handleReadChapter(c)} disabled={isOpening} className="min-w-0 text-left cursor-pointer disabled:cursor-default">
                         <p className={`text-xs font-medium truncate ${c.read ? 'text-fg-muted' : 'text-fg'}`}>
                           {tMaybe(c.name) || t('Capítulo {n}', { n: c.number })}
                         </p>
@@ -944,7 +945,7 @@ export const MangaDetailView: React.FC<MangaDetailViewProps> = ({
                             {t('Página {n}', { n: c.lastPageRead || 0 })}
                           </span>
                         )}
-                      </div>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">

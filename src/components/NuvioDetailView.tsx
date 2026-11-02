@@ -192,10 +192,11 @@ export const NuvioDetailView: React.FC<Props> = ({ work, focusEpisode, onOpenTab
 
   // Assistir: abre "Onde assistir" (todas as fontes), igual à página da Biblioteca
   const search = useCallback(
-    async (tg: Target) => {
+    async (tg: Target, autoPlay = true) => {
       if (!meta) return;
       setTarget(tg);
       openWatchSources({
+        autoPlay,
         title: meta.name,
         year: meta.year ? Number(String(meta.year).slice(0, 4)) || undefined : undefined,
         kind: meta.type === 'movie' ? 'movie' : 'series',
@@ -353,6 +354,16 @@ export const NuvioDetailView: React.FC<Props> = ({ work, focusEpisode, onOpenTab
                   if (pos?.t) return meta?.type === 'movie' ? t('Continuar · {time}', { time: fmtClock(pos.t) }) : t('Continuar {ep} · {time}', { ep: nextUp!.label, time: fmtClock(pos.t) });
                   return meta?.type === 'movie' ? t('Assistir') : nextUp ? t('Assistir {ep}', { ep: nextUp.label }) : t('Assistir');
                 })()}
+              </button>
+              <button
+                type="button"
+                disabled={!nextUp}
+                onClick={() => nextUp && void search(nextUp, false)}
+                title={t('Ver todos os links e escolher a fonte')}
+                className="h-9 px-4 rounded-md bg-subtle hover:bg-elevated border border-line text-fg text-[13px] font-medium inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Radio size={14} />
+                {t('Onde assistir')}
               </button>
               <button
                 type="button"

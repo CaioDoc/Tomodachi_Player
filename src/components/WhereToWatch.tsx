@@ -18,7 +18,7 @@ import {
   type ExtensionMatch,
   type ExtensionEpisode,
 } from '../api/watchSources';
-import { nuvioMeta, runNuvioScrapers, playNuvioStream, getNuvioState, nuvioWorkUrl, addonsFor, activeScrapers, kitsuOnlyStreamAddons, type NuvioMeta, type NuvioMetaPreview, type ScraperRun } from '../api/nuvio';
+import { nuvioMeta, runNuvioScrapers, playNuvioStream, getNuvioState, nuvioWorkUrl, addonsFor, activeScrapers, kitsuOnlyStreamAddons, isTorrentStream, qualityRank, type NuvioMeta, type NuvioMetaPreview, type NuvioStream, type ScraperRun } from '../api/nuvio';
 import { type InstalledExtension } from '../api/extensionRegistry';
 import { StreamRunList } from './StreamRunList';
 import { t, tn } from '../i18n';
@@ -38,6 +38,19 @@ const SectionTitle: React.FC<{ icon: React.ReactNode; title: string; hint?: stri
     {right && <span className="ml-auto">{right}</span>}
   </div>
 );
+
+/** Endereço do site de uma extensão (vazio quando ela não tem site conhecido) */
+const siteUrlOf = (ext: InstalledExtension) => {
+  const raw = String(ext.baseUrl || '').trim();
+  return raw ? (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`) : '';
+};
+
+/** Melhor link para tocar sozinho: maior qualidade, sem torrent (torrent pode precisar de debrid) */
+function bestAutoStream(runs: ScraperRun[] | null): NuvioStream | null {
+  const all = (runs || []).filter((r) => r.status === 'done').flatMap((r) => r.streams);
+  const ok = all.filter((s) => !isTorrentStream(s));
+  return ok.sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality))[0] || null;
+}
 
 /* ───────────────────────── Sites (extensões) ───────────────────────── */
 
@@ -146,32 +159,40 @@ const ExtensionCard: React.FC<{
   onPicked?: (match: ExtensionMatch | null) => void;
   /** Botão para ligar/desligar a busca neste site */
   toggle?: React.ReactNode;
-}> = ({ ext, state, req, episode, onPlay, onPicked, toggle }) => {
+  /** Pede a vez para tocar sozinho (só o primeiro site que ficar pronto toca) */
+  auto?: () => boolean;
+}> = ({ ext, state, req, episode, onPlay, onPicked, toggle, auto }) => {
   const [picked, setPicked] = useState<ExtensionMatch | null>(null);
   const [eps, setEps] = useState<ExtensionEpisode[] | null>(null);
   const [loadingEps, setLoadingEps] = useState(false);
   const [epsError, setEpsError] = useState<string | null>(null);
 
-  const pick = async (m: ExtensionMatch) => {
+  const pick = async (m: ExtensionMatch, isAuto = false) => {
     setPicked(m);
     onPicked?.(m);
     setEps(null);
     setEpsError(null);
     setLoadingEps(true);
+    let list: ExtensionEpisode[] = [];
     try {
-      setEps(await cachedEpisodes(ext, m.url));
+      list = await cachedEpisodes(ext, m.url);
+      setEps(list);
     } catch (err: any) {
       setEpsError(String(err?.message || err));
       setEps([]);
     } finally {
       setLoadingEps(false);
     }
+    // "Assistir" (e não "Onde assistir"): o primeiro site pronto já toca, sem mais cliques
+    if (!isAuto) return;
+    const ep = list.find((e) => e.number === episode) || null;
+    if ((req.kind === 'movie' || !list.length || ep) && auto?.()) onPlay(ext, req.kind === 'movie' ? null : ep, m);
   };
 
   // Resultado muito parecido: já abre os episódios
   useEffect(() => {
     if (state.status === 'searching') setPicked(null);
-    if (!picked && state.status === 'done' && state.matches[0]?.score >= 0.8) void pick(state.matches[0]);
+    if (!picked && state.status === 'done' && state.matches[0]?.score >= 0.8) void pick(state.matches[0], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.status]);
 
@@ -281,12 +302,13 @@ const ExtensionCard: React.FC<{
 };
 
 /** Procura a obra em todas as extensões de anime instaladas */
-export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: OpenTabFn; onPlayed?: () => void; episodeUrl?: string }> = ({
+export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: OpenTabFn; onPlayed?: () => void; episodeUrl?: string; auto?: () => boolean }> = ({
   req,
   episode,
   onOpenTab,
   onPlayed,
   episodeUrl,
+  auto,
 }) => {
   const allExts = useMemo(() => animeExtensionsFor(req), [req]);
   const [off, setOff] = useState<Set<string>>(readOff);
@@ -442,6 +464,7 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
               onPlay={play}
               onPicked={(m) => rememberMatch(req, ext.pkg, m)}
               toggle={toggle}
+              auto={auto}
             />
           );
         }
@@ -454,6 +477,20 @@ export const ExtensionSites: React.FC<{ req: WatchRequest; episode: number; onOp
             <span className="ml-auto text-[11px] text-fg-muted truncate" title={state.error}>
               {!on ? t('desligado') : state.status === 'error' ? t('o site não respondeu') : t('nada encontrado')}
             </span>
+            {/* Site que não respondeu (ou não achou): abrir a página ajuda quando ele pede verificação */}
+            {on && !!siteUrlOf(ext) && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenTab?.('webview', ext.name, { url: siteUrlOf(ext), initialUrl: siteUrlOf(ext), videoSource: { name: ext.name, pkg: ext.pkg } });
+                  onPlayed?.();
+                }}
+                className="text-[11px] text-accent hover:underline cursor-pointer shrink-0"
+                title={t('Abrir o site no app (e assistir por lá)')}
+              >
+                {t('abrir')}
+              </button>
+            )}
             {toggle}
           </div>
         );
@@ -471,7 +508,7 @@ export function hasStreamSources(kind: 'movie' | 'series'): boolean {
   return activeScrapers(kind === 'movie' ? 'movie' : 'tv').length > 0 || addonsFor('stream', kind).length > 0;
 }
 
-const CatalogLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: OpenTabFn; onPlayed?: () => void; episodeUrl?: string }> = ({ req, episode, onOpenTab, onPlayed, episodeUrl }) => {
+const CatalogLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: OpenTabFn; onPlayed?: () => void; episodeUrl?: string; auto?: () => boolean }> = ({ req, episode, onOpenTab, onPlayed, episodeUrl, auto }) => {
   const [candidates, setCandidates] = useState<NuvioMetaPreview[] | null>(null);
   const [chosen, setChosen] = useState<NuvioMetaPreview | null>(null);
   const [meta, setMeta] = useState<NuvioMeta | null>(null);
@@ -549,6 +586,31 @@ const CatalogLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: O
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta, se?.season, se?.episode]);
+
+  const playStream = (st: NuvioStream) => {
+    if (!meta) return;
+    const label = meta.type === 'movie' ? meta.name : `${req.title} - ${t('T{s} E{e}', { s: se?.season ?? 1, e: se?.episode ?? 1 })}`;
+    const ep = se ? meta.episodes.find((e) => e.season === se.season && e.episode === se.episode) : null;
+    void playNuvioStream(
+      st,
+      {
+        title: label,
+        episodeUrl: episodeUrl || req.episodeUrl || (meta.type === 'movie' ? nuvioWorkUrl('movie', meta.id) : `${nuvioWorkUrl('series', meta.id)}:${se?.season}:${se?.episode}`),
+        stremio: { type: meta.type, id: meta.type === 'movie' ? meta.id : ep?.id || `${meta.id}:${se?.season}:${se?.episode}` },
+        work: { title: req.title, url: req.workUrl, cover: req.cover || meta.poster },
+      },
+      onOpenTab
+    );
+    onPlayed?.();
+  };
+
+  // "Assistir": o primeiro link bom que aparecer já toca
+  useEffect(() => {
+    if (!auto || !runs || !meta) return;
+    const st = bestAutoStream(runs);
+    if (st && auto()) playStream(st);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runs, meta]);
 
   const seasons = meta ? Array.from(new Set(meta.episodes.filter((e) => e.season > 0).map((e) => e.season))) : [];
   const epsOfSeason = meta && se ? meta.episodes.filter((e) => e.season === se.season) : [];
@@ -660,32 +722,14 @@ const CatalogLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: O
           <Loader2 size={13} className="animate-spin" /> {t('Iniciando plugins…')}
         </div>
       ) : (
-        <StreamRunList
-          runs={runs}
-          searching={searching}
-          onPlay={(s) => {
-            const label = meta.type === 'movie' ? meta.name : `${req.title} - ${t('T{s} E{e}', { s: se?.season ?? 1, e: se?.episode ?? 1 })}`;
-            const ep = se ? meta.episodes.find((e) => e.season === se.season && e.episode === se.episode) : null;
-            void playNuvioStream(
-              s,
-              {
-                title: label,
-                episodeUrl: episodeUrl || req.episodeUrl || (meta.type === 'movie' ? nuvioWorkUrl('movie', meta.id) : `${nuvioWorkUrl('series', meta.id)}:${se?.season}:${se?.episode}`),
-                stremio: { type: meta.type, id: meta.type === 'movie' ? meta.id : ep?.id || `${meta.id}:${se?.season}:${se?.episode}` },
-                work: { title: req.title, url: req.workUrl, cover: req.cover || meta.poster },
-              },
-              onOpenTab
-            );
-            onPlayed?.();
-          }}
-        />
+        <StreamRunList runs={runs} searching={searching} onPlay={playStream} />
       )}
     </div>
   );
 };
 
 /** Addons de anime que só entendem IDs do Kitsu: acha a obra no Kitsu e busca neles também */
-const KitsuLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: OpenTabFn; onPlayed?: () => void; episodeUrl?: string }> = ({ req, episode, onOpenTab, onPlayed, episodeUrl }) => {
+const KitsuLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: OpenTabFn; onPlayed?: () => void; episodeUrl?: string; auto?: () => boolean }> = ({ req, episode, onOpenTab, onPlayed, episodeUrl, auto }) => {
   const addons = useMemo(() => kitsuOnlyStreamAddons(req.kind === 'movie' ? 'movie' : 'series'), [req.kind]);
   const [runs, setRuns] = useState<ScraperRun[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -718,6 +762,24 @@ const KitsuLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: Ope
     };
   }, [kitsuId, episode, req.kind, addons]);
 
+  const playStream = (st: NuvioStream) => {
+    const label = req.kind === 'movie' ? req.title : `${req.title} - ${t('Episódio {n}', { n: episode })}`;
+    void playNuvioStream(
+      st,
+      { title: label, episodeUrl: episodeUrl || req.episodeUrl || `kitsu:${kitsuId}:${episode}`, stremio: { type: req.kind === 'movie' ? 'movie' : 'series', id: req.kind === 'movie' ? `kitsu:${kitsuId}` : `kitsu:${kitsuId}:${episode}` }, work: { title: req.title, url: req.workUrl, cover: req.cover } },
+      onOpenTab
+    );
+    onPlayed?.();
+  };
+
+  // "Assistir": o primeiro link bom que aparecer já toca
+  useEffect(() => {
+    if (!auto || !runs) return;
+    const st = bestAutoStream(runs);
+    if (st && auto()) playStream(st);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runs]);
+
   if (!addons.length) return null;
   if (kitsuId === undefined) {
     return (
@@ -730,24 +792,10 @@ const KitsuLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: Ope
     return <p className="px-4 py-1.5 text-[11.5px] text-fg-muted">{t('Não encontrei a obra no Kitsu; {n} addon(s) de anime ficaram de fora.', { n: addons.length })}</p>;
   }
   if (!runs) return null;
-  return (
-    <StreamRunList
-      runs={runs}
-      searching={searching}
-      onPlay={(s) => {
-        const label = req.kind === 'movie' ? req.title : `${req.title} - ${t('Episódio {n}', { n: episode })}`;
-        void playNuvioStream(
-          s,
-          { title: label, episodeUrl: episodeUrl || req.episodeUrl || `kitsu:${kitsuId}:${episode}`, stremio: { type: req.kind === 'movie' ? 'movie' : 'series', id: req.kind === 'movie' ? `kitsu:${kitsuId}` : `kitsu:${kitsuId}:${episode}` }, work: { title: req.title, url: req.workUrl, cover: req.cover } },
-          onOpenTab
-        );
-        onPlayed?.();
-      }}
-    />
-  );
+  return <StreamRunList runs={runs} searching={searching} onPlay={playStream} />;
 };
 
-const DirectLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: OpenTabFn; onPlayed?: () => void; episodeUrl?: string }> = (props) => (
+const DirectLinks: React.FC<{ req: WatchRequest; episode: number; onOpenTab?: OpenTabFn; onPlayed?: () => void; episodeUrl?: string; auto?: () => boolean }> = (props) => (
   <>
     <CatalogLinks {...props} />
     <KitsuLinks {...props} />
@@ -793,6 +841,31 @@ export const WhereToWatch: React.FC<{ req: WatchRequest; episode: number; onOpen
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hasSites = useMemo(() => animeExtensionsFor(req).length > 0, [req, version]);
 
+  // "Assistir" (não "Onde assistir"): a primeira fonte que ficar pronta toca sozinha
+  const [autoOn, setAutoOn] = useState(!!req.autoPlay);
+  const autoUsed = useRef(false);
+  useEffect(() => {
+    autoUsed.current = false;
+    setAutoOn(!!req.autoPlay);
+  }, [req]);
+  // Demorou: o aviso muda de tom (o usuário pode escolher na lista, que já está logo abaixo)
+  const [autoSlow, setAutoSlow] = useState(false);
+  useEffect(() => {
+    setAutoSlow(false);
+    if (!autoOn) return;
+    const id = setTimeout(() => setAutoSlow(true), 20000);
+    return () => clearTimeout(id);
+  }, [autoOn, req]);
+  const autoOnRef = useRef(autoOn);
+  autoOnRef.current = autoOn;
+  const claimAuto = useCallback(() => {
+    if (!autoUsed.current && autoOnRef.current) {
+      autoUsed.current = true;
+      return true;
+    }
+    return false;
+  }, []);
+
   // Nome digitado pelo usuário ("Buscar com outro nome")
   const [custom, setCustom] = useState('');
   const [override, setOverride] = useState<string | null>(null);
@@ -827,24 +900,44 @@ export const WhereToWatch: React.FC<{ req: WatchRequest; episode: number; onOpen
   // Episódio escolhido no painel: usa a URL dele (para marcar como visto e retomar o certo)
   const epUrl = req.episodeUrls?.[String(episode)] ?? (episode === (req.episode ?? 1) ? req.episodeUrl : undefined);
 
+  const autoBanner = autoOn ? (
+    <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-accent/10 border border-accent/30 flex items-center gap-2">
+      <Loader2 size={13} className="text-accent animate-spin shrink-0" />
+      <span className="text-[12px] text-fg min-w-0 flex-1">
+        {autoSlow ? t('Ainda procurando… se quiser, escolha uma fonte na lista abaixo.') : t('Procurando em todas as fontes: a primeira que responder já começa a tocar.')}
+      </span>
+      <button type="button" onClick={() => setAutoOn(false)} className="text-[11.5px] text-accent hover:underline cursor-pointer shrink-0">
+        {t('Deixa eu escolher')}
+      </button>
+    </div>
+  ) : null;
+
   if (!hasLinks && !hasSites) return <NoSourcesHint compact onNavigate={onPlayed} />;
   if (!ready) {
     return (
-      <div className="p-6 flex items-center justify-center gap-2 text-[12.5px] text-fg-muted">
-        <Loader2 size={14} className="animate-spin" /> {t('Preparando a busca…')}
+      <div className="pb-2">
+        {autoBanner}
+        <div className="p-6 flex items-center justify-center gap-2 text-[12.5px] text-fg-muted">
+          <Loader2 size={14} className="animate-spin" /> {t('Preparando a busca…')}
+        </div>
       </div>
     );
   }
+  const auto = autoOn ? claimAuto : undefined;
   return (
     <div className="pb-2">
-      {hasLinks && <DirectLinks key={`l${version}`} req={ready} episode={episode} episodeUrl={epUrl} onOpenTab={onOpenTab} onPlayed={onPlayed} />}
+      {autoBanner}
+      {hasLinks && <DirectLinks key={`l${version}`} req={ready} episode={episode} episodeUrl={epUrl} onOpenTab={onOpenTab} onPlayed={onPlayed} auto={auto} />}
       {hasLinks && hasSites && <div className="mx-4 my-1 border-t border-line-subtle" />}
-      {hasSites && <ExtensionSites key={`s${version}`} req={ready} episode={episode} episodeUrl={epUrl} onOpenTab={onOpenTab} onPlayed={onPlayed} />}
+      {hasSites && <ExtensionSites key={`s${version}`} req={ready} episode={episode} episodeUrl={epUrl} onOpenTab={onOpenTab} onPlayed={onPlayed} auto={auto} />}
       <form
         className="mx-4 mt-3 pt-3 border-t border-line-subtle"
         onSubmit={(e) => {
           e.preventDefault();
-          if (custom.trim()) setOverride(custom.trim());
+          if (custom.trim()) {
+            setAutoOn(false);
+            setOverride(custom.trim());
+          }
         }}
       >
         <label className="block text-[11px] text-fg-muted mb-1">{t('Não achou? Busque com outro nome (ex.: o título em inglês ou japonês)')}</label>

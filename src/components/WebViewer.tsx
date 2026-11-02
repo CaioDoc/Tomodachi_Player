@@ -61,6 +61,9 @@ export const WebViewer: React.FC<WebViewerProps> = ({
   // `url` = endereço atual exibido; o atributo src do <webview> é definido uma única vez
   // (alterá-lo a cada navegação recarregava a página e quebrava sites SPA).
   const [url, setUrl] = useState(initialUrl);
+  // Páginas que costumam ter vídeo: mostra "Assistir no app" mesmo fora de uma extensão
+  const VIDEO_PAGE = /\/(?:anime|animes|episodio|episodios|episode|watch|assistir|ver|filme|filmes|movie|movies|serie|series|video|videos|player|ep)\b|[?&](?:v|id|ep)=/i;
+  const showWatch = !!videoSource || (/^https?:\/\//i.test(url) && VIDEO_PAGE.test(url));
   const [webviewSrc] = useState(initialUrl);
   const webviewReadyRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
@@ -508,13 +511,13 @@ export const WebViewer: React.FC<WebViewerProps> = ({
           </div>
         </form>
 
-        {/* Site de uma extensão de vídeo: o vídeo da página toca no player do app */}
-        {videoSource && onOpenTab && (
+        {/* Página de vídeo (ou site de uma extensão): o vídeo toca no player do app */}
+        {showWatch && onOpenTab && (
           <>
             <button
               type="button"
               onClick={() => {
-                const title = (currentTitle || '').trim() || videoSource.name;
+                const title = (currentTitle || '').trim() || videoSource?.name || t('Vídeo');
                 onOpenTab('video-player', title, { filePath: url, title, item: { path: url, name: title }, episodeUrl: url, work: { title } });
               }}
               className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-accent hover:bg-accent-hover text-accent-fg text-[12px] font-semibold shrink-0 cursor-pointer"
@@ -525,8 +528,17 @@ export const WebViewer: React.FC<WebViewerProps> = ({
             <button
               type="button"
               onClick={() => {
-                const title = (currentTitle || '').replace(/\s*[|–—-]\s*[^|–—-]*$/, '').trim() || videoSource.name;
-                onOpenTab('anime-detail', title, { anime: { url, title, cover: '', source: videoSource.pkg, sourceName: videoSource.name, chapters: [], favorite: false, categories: [] } });
+                const title = (currentTitle || '').replace(/\s*[|–—-]\s*[^|–—-]*$/, '').trim() || videoSource?.name || t('Obra');
+                const host = (() => {
+                  try {
+                    return new URL(url).host.replace(/^www\./, '');
+                  } catch {
+                    return '';
+                  }
+                })();
+                onOpenTab('anime-detail', title, {
+                  anime: { url, title, cover: '', source: videoSource?.pkg || host, sourceName: videoSource?.name || host, chapters: [], favorite: false, categories: [] },
+                });
               }}
               className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-subtle hover:bg-elevated border border-line text-[12px] text-fg shrink-0 cursor-pointer"
               title={t('Abre esta obra no app, com a lista de episódios')}

@@ -64,9 +64,9 @@ const parts: Parts = {
     'Pega el enlace de cualquier extensión, plugin o addon. Tomodachi detecta el tipo solo.',
   ],
   'Link da fonte': ['Source link', 'Enlace de la fuente'],
-  'Não importa o tipo: ao clicar em Assistir, o app procura em todas as fontes ligadas e junta os links numa lista só.': [
-    'The type does not matter: when you click Watch, the app searches all enabled sources and puts the links in a single list.',
-    'El tipo no importa: al hacer clic en Ver, la app busca en todas las fuentes activas y junta los enlaces en una sola lista.',
+  'Não importa o tipo: ao clicar em Assistir, o app procura em todas as fontes ligadas e toca a primeira que responder — sempre aqui dentro.': [
+    'The type does not matter: when you click Watch, the app searches all enabled sources and plays the first one that answers — always right here.',
+    'El tipo no importa: al hacer clic en Ver, la app busca en todas las fuentes activas y reproduce la primera que responda — siempre aquí dentro.',
   ],
   'Remover extensão': ['Remove extension', 'Quitar extensión'],
   'Remover a extensão {name}?': ['Remove the {name} extension?', '¿Quitar la extensión {name}?'],

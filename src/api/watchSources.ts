@@ -35,6 +35,8 @@ export interface WatchRequest {
   preferred?: { extName: string; url?: string };
   /** Aba inicial */
   tab?: 'extensions' | 'plugins';
+  /** Toca sozinho a primeira fonte que responder (o usuário clicou em "Assistir", não em "Onde assistir") */
+  autoPlay?: boolean;
 }
 
 /** Abre o painel lateral de fontes */

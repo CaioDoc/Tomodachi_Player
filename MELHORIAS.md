@@ -634,3 +634,22 @@ Revisão geral: verificação de tipos, compilação do Electron, traduções (0
 | "Watch" busca sozinho em todas as extensões, cada uma com um toggle | O "Onde assistir" busca automaticamente em todos os sites ligados. **Cada site tem um botãozinho liga/desliga**: os que acharam, os que não acharam, os que não responderam e os desligados. Desligar para a busca naquele site, ligar busca na hora, e a escolha fica salva para os próximos episódios e obras. No topo há "Buscando em N de M sites", com **Ligar todos** e **Desligar todos**. |
 
 Teste automático novo: **Fontes → Browse** abre a página do site com "Assistir no app". O teste do "Onde assistir" agora confere que todos os sites têm o liga/desliga e que desligar um fica salvo.
+
+## Assistir é só clicar: o vídeo toca na hora, venha de onde vier (1.8.0-beta)
+
+Revisão completa de Animes & Vídeos com um objetivo: do clique ao vídeo, sem passos no meio e sempre dentro do app.
+
+| O que mudou | Como era | Como ficou |
+|---|---|---|
+| **"Assistir" toca na hora** | Clicar no episódio abria o painel de fontes; só depois de escolher um site o vídeo começava. | Episódio com link de verdade (site ou arquivo) **toca direto no player do app**. O painel "Onde assistir" continua num botão próprio, para quando você quiser trocar de fonte. |
+| **Obras sem link próprio** | O painel abria e ficava esperando um clique. | O app procura em **todas as fontes ligadas ao mesmo tempo e toca a primeira que responder** (plugins, addons e sites). Um aviso no topo explica e tem "Deixa eu escolher" se você preferir a lista. |
+| **Filmes e páginas sem lista de episódios** | "Nenhum episódio" e nada para clicar. | A própria página vira o **episódio 1**: o botão Assistir aparece e toca. |
+| **Obra favoritada sem episódios salvos** | A lista ficava vazia para sempre. | O app lê os episódios no site e **salva**, então na próxima vez ela abre pronta. |
+| **Catálogo da extensão dentro do app** | Só dava para ver o site cru. | Cada extensão em Fontes ganhou o botão **Obras**: as capas e os títulos do próprio site, em grade, dentro do app. Clicar numa capa abre a obra e o Assistir toca. O botão **Navegar** continua abrindo o site. |
+| **Navegar antes de instalar** | Só dava para instalar e torcer. | Cada extensão da lista "Extensões para instalar" tem **Navegar**: você vê o site antes, e já dá para assistir por ele (o navegador do app tem "Assistir no app" e "Episódios no app"). |
+| **Fontes que não dá para navegar** | Plugins e addons só de links (Torrentio) mostravam "Navegar" e levavam a um catálogo genérico. | Quem **não tem catálogo próprio não mostra o botão**. Só aparece o que leva a algum lugar. |
+| **Quando o site exige verificação** | Só restava "tentar de novo". | O player e o painel de fontes agora oferecem **abrir a página no navegador do app**: você passa pela verificação e assiste por ali, com a sessão já reconhecida. |
+| **Navegador do app** | Os botões de assistir só apareciam em sites de extensões instaladas. | Em **qualquer página de vídeo** o navegador mostra "Assistir no app" e "Episódios no app". |
+| **Mangás** | Só o botão "Ler" abria o capítulo. | Clicar no **nome do capítulo** também abre o leitor, igual aos episódios. |
+
+Testes automáticos novos no Windows: "Assistir" toca o episódio na hora (sem painel); Fontes → "Obras" mostra o catálogo do site dentro do app; addon só de links não mostra "Navegar".

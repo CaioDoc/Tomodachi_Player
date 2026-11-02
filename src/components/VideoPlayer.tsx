@@ -1415,6 +1415,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   <Radio size={14} /> {t('Procurar em outras fontes')}
                 </button>
               )}
+              {/* Alguns sites só liberam o vídeo depois de uma verificação: abre a página aqui no app
+                  e o botão "Assistir no app" da barra toca o vídeo com a sessão já verificada */}
+              {/^https?:\/\//i.test(currentEpisodeUrl || '') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const name = (() => {
+                      try {
+                        return new URL(currentEpisodeUrl!).host.replace(/^www\./, '');
+                      } catch {
+                        return t('Site');
+                      }
+                    })();
+                    onOpenTab?.('webview', name, { url: currentEpisodeUrl, initialUrl: currentEpisodeUrl, videoSource: { name, pkg: name } });
+                  }}
+                  className="h-9 px-4 rounded-md bg-subtle hover:bg-elevated border border-line text-[12.5px] text-fg inline-flex items-center gap-1.5 cursor-pointer"
+                  title={t('Abre a página no navegador do app; depois use "Assistir no app" na barra')}
+                >
+                  <Globe size={14} /> {t('Abrir a página no app')}
+                </button>
+              )}
             </div>
           </div>
         ) : (
