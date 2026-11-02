@@ -680,3 +680,11 @@ Quando você procurava pelo navegador (Browse) dentro da extensão o site achava
 Também: o endereço de busca guardado de cada site deixa de ser usado quando para de trazer resultados (o site mudou) — o app procura o formulário de novo em vez de desistir.
 
 Teste automático novo: com uma busca que não bate com nada, o app avisa e, ao pedir, mostra a obra que o site respondeu.
+
+## Abrir o app e já buscar (1.9.2-beta)
+
+As fontes instaladas ficam prontas assim que a janela abre — não é preciso esperar. O que atrapalhava:
+
+- **A busca recomeçava sozinha** quando a atualização automática das extensões rodava (ela roda poucos segundos depois de abrir o app). Agora o app compara a lista de fontes e, se nada mudou, a busca em andamento continua de onde estava.
+- **A primeira busca em cada site podia demorar demais**: ao aprender como o site busca, o app podia recarregar várias páginas como navegador. Agora é no máximo uma recarga por busca, e com espera menor.
+- **Extensão atualizada** (quando o site muda de endereço) agora limpa na hora a marca de "site fora do ar", em vez de deixá-la valendo por 30 minutos.

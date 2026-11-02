@@ -203,6 +203,14 @@ const DEAD_MS = 30 * 60 * 1000;
 const deadHosts = new Map<string, number>();
 const noFormHosts = new Set<string>();
 
+// Extensão atualizada (o site pode ter mudado de endereço): tenta de novo em todos os sites
+if (typeof window !== 'undefined') {
+  window.addEventListener('extensions:updated', () => {
+    deadHosts.clear();
+    noFormHosts.clear();
+  });
+}
+
 export async function searchSite(baseUrl: string, query: string, scorer: Scorer): Promise<SiteItem[]> {
   const base = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
   const host = hostOf(base);
@@ -216,6 +224,8 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
   let workingTpl: string | null = null;
   let bestTop = 0;
   let reachable = false;
+  // Recarregar como navegador custa alguns segundos: só uma vez por busca
+  let browserLeft = 1;
   const tryTemplate = async (tpl: string) => {
     if (tried.has(tpl)) return false;
     tried.add(tpl);
@@ -226,7 +236,8 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
     let items = extractSiteItems(page.doc, page.url, scorer);
     // Sites que montam os resultados com JavaScript devolvem uma página vazia no pedido simples:
     // carrega de novo como navegador (é o que o usuário vê ao abrir o site)
-    if (items.length === 0) {
+    if (items.length === 0 && browserLeft > 0) {
+      browserLeft--;
       const rendered = await getDoc(url, base, true).catch(() => null);
       if (rendered) {
         page = rendered;
@@ -259,7 +270,10 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
   // Formulário de busca da página inicial (o jeito "oficial" do site): guarda mesmo sem achar a obra
   let home = noFormHosts.has(host) ? null : await getDoc(base);
   // Página inicial montada por JavaScript: o formulário de busca só existe depois de carregar
-  if (home && !findSearchTemplate(home.doc, home.url)) home = (await getDoc(base, undefined, true).catch(() => null)) || home;
+  if (home && browserLeft > 0 && !findSearchTemplate(home.doc, home.url)) {
+    browserLeft--;
+    home = (await getDoc(base, undefined, true).catch(() => null)) || home;
+  }
   if (home) {
     reachable = true;
     const tpl = findSearchTemplate(home.doc, home.url);

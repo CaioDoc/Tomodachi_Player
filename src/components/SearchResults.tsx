@@ -117,6 +117,7 @@ export const SearchResults: React.FC<{
   showWeak?: boolean;
 }> = ({ query, genres = [], kind = 'anilist', onOpenTab, onStatus, showWeak }) => {
   const [version, setVersion] = useState(0);
+  const sourcesRef = useRef<{ sig: string; value: { sites: InstalledExtension[]; addons: { addon: StremioAddon; cats: AddonCatalogRef[]; browse: boolean }[]; links: StremioAddon[]; pluginCount: number } } | null>(null);
   const [states, setStates] = useState<SourceState[]>([]);
   const [enrich, setEnrich] = useState<EnrichIndex | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -160,7 +161,14 @@ export const SearchResults: React.FC<{
     const links = linkOnlyAddons(new Set(byAddon.keys()));
     const st = getNuvioState();
     const pluginCount = st.enabled ? new Set([...activeScrapers('movie'), ...activeScrapers('tv')].map((x) => x.scraper.id)).size : 0;
-    return { sites, addons, links, pluginCount };
+    const next = { sites, addons, links, pluginCount };
+    // As fontes são avisadas de qualquer mudança (inclusive a atualização automática das extensões,
+    // que roda sozinha logo depois de abrir o app). Se a lista continua a mesma, mantém o mesmo objeto
+    // para não reiniciar uma busca que já está em andamento.
+    const sig = JSON.stringify([sites.map((x) => x.pkg + baseUrlOf(x)), addons.map((g) => g.addon.url + g.cats.map((c) => c.key).join()), links.map((a2) => a2.url), pluginCount]);
+    if (sourcesRef.current && sourcesRef.current.sig === sig) return sourcesRef.current.value;
+    sourcesRef.current = { sig, value: next };
+    return next;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
 

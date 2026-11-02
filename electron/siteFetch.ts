@@ -111,7 +111,8 @@ export async function fetchHtml(url: string, opts: { referer?: string; noCache?:
   if (downAt && Date.now() - downAt < DOWN_MS) return { success: false, error: 'O site não respondeu' };
   // Página montada por JavaScript (a busca do site não aparece no HTML simples): carrega como navegador
   if (opts.browser) {
-    const r = await viaBrowser(url);
+    // A página já existe: é só esperar o JavaScript montar os resultados (não precisa dos 15 s)
+    const r = await viaBrowser(url, 9000);
     if (r.success && r.html) {
       browserHosts.add(host);
       cache.set(url, { at: Date.now(), html: r.html, url: r.url || url });
