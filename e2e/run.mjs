@@ -550,7 +550,10 @@ await step('Extensão · "Assistir" toca o episódio na hora (sem passar pelo pa
   await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, tabsBefore, { timeout: 30000 });
   await sleep(2500);
   const t0 = Date.now();
-  await visible(page, 'button:has-text("Assistir:")').first().click();
+  // O botão principal da obra ("Assistir: Episódio 1" ou "Continuar: …" se já tiver posição salva)
+  const playBtn = page.locator('button >> visible=true').filter({ hasText: /^(Assistir|Continuar|Próximo):/ }).first();
+  await playBtn.waitFor({ timeout: 20000 });
+  await playBtn.click();
   await sleep(1200);
   const drawer = await page.locator('[role=dialog] >> visible=true').count();
   await page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.offsetParent && v.currentTime > 1), null, { timeout: 60000 });
@@ -604,8 +607,8 @@ await step('Fontes · "Obras" mostra o catálogo do site dentro do app', async (
   await sleep(4000);
   await shot(page, 'fontes-obras');
   const site = await page.locator('button:has-text("Abrir o site") >> visible=true').count();
-  const cards = await page.locator('[role=button], .group').filter({ hasNotText: '' }).count();
-  const covers = await page.locator('img[loading=lazy] >> visible=true').count();
+  const cards = await page.locator('div.group >> visible=true').count();
+  const covers = await page.locator('img >> visible=true').count();
   const webviews = await page.locator('webview').count();
   await page.keyboard.press('Control+w').catch(() => {});
   await sleep(600);
