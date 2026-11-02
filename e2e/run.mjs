@@ -547,20 +547,17 @@ await step('Extensão · "Assistir" toca o episódio na hora (sem passar pelo pa
   await input.fill('Tomodachi Teste');
   await page.locator('section[aria-label="Resultados nas suas fontes"] >> text=Site Teste').first().waitFor({ timeout: 45000 });
   await waitSearchDone();
-  const tabsBefore = await page.locator('[draggable=true]').count();
+  // A aba da obra pode já existir (o app reaproveita em vez de abrir outra): espera a página, não uma aba nova
   await page.locator('section[aria-label="Resultados nas suas fontes"] div.group > button:first-child >> visible=true').first().click();
-  await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, tabsBefore, { timeout: 30000 });
+  await page.locator('h1:has-text("Tomodachi Teste") >> visible=true').first().waitFor({ timeout: 30000 });
   await sleep(2500);
   const t0 = Date.now();
   // O botão principal da obra ("Assistir: Episódio 1", ou "Continuar: …" quando já há posição salva)
   const playBtn = page.getByRole('button', { name: /^(Assistir|Continuar|Próximo)[:\s]/ }).first();
   await playBtn.waitFor({ timeout: 20000 });
   const label = (await playBtn.innerText()).trim();
-  const tabsBeforePlay = await page.locator('[draggable=true]').count();
   await playBtn.click();
-  // Tem de abrir a aba do player (e não o painel de fontes)
-  await page.waitForFunction((n) => document.querySelectorAll('[draggable=true]').length > n, tabsBeforePlay, { timeout: 25000 });
-  await sleep(1000);
+  await sleep(1500);
   const drawer = await page.locator('[role=dialog] >> visible=true').count();
   await page.waitForFunction(() => [...document.querySelectorAll('video')].some((v) => v.offsetParent && v.currentTime > 1), null, { timeout: 60000 });
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
