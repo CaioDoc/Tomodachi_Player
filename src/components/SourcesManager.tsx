@@ -312,7 +312,7 @@ const ExtensionRow: React.FC<{ ext: InstalledExtension; onBrowse: (ext: Installe
       >
         <Sparkles size={13} /> {t('Obras')}
       </button>
-      {!!domain && <SourceCheckBtn baseUrl={domain} name={ext.name} />}
+      {!!domain && <SourceCheckBtn baseUrl={ext.baseUrl || domain} name={ext.name} />}
       {/* Sem site conhecido não há o que navegar: o botão nem aparece */}
       {!!domain && <BrowseBtn onClick={() => onBrowse(ext)} />}
       <IconBtn
@@ -536,7 +536,7 @@ const AvailableExtensions: React.FC<{ installed: InstalledExtension[]; onOpenTab
                     </span>
                     <span className="text-[10.5px] text-fg-muted font-mono">{[site, ext.lang, ext.versionName || ext.version].filter(Boolean).join(' · ')}</span>
                   </span>
-                  {!!site && <SourceCheckBtn baseUrl={site} name={ext.name.replace(/^Aniyomi:\s*/i, '')} small />}
+                  {!!site && <SourceCheckBtn baseUrl={ext.baseUrl || ext.sources?.[0]?.baseUrl || site} name={ext.name.replace(/^Aniyomi:\s*/i, '')} small />}
                   {/* Espiar o site antes de instalar */}
                   {!!site && (
                     <button

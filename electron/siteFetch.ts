@@ -78,12 +78,15 @@ function viaBrowser(url: string, timeoutMs = 15000): Promise<FetchHtmlResult> {
       }
       resolve(r);
     };
+    let loadedAt = 0;
     const grab = async () => {
       if (done || win.isDestroyed()) return;
       try {
         const html: string = await win.webContents.executeJavaScript('document.documentElement.outerHTML', true);
-        // Verificação do Cloudflare costuma sumir sozinha em poucos segundos: espera
-        if (html && !looksBlocked(html) && html.length > 2000) finish({ success: true, html, url: win.webContents.getURL(), via: 'browser' });
+        if (!html || looksBlocked(html)) return; // verificação do Cloudflare some sozinha: espera
+        // Página grande já vale; página pequena (site simples) vale pouco depois de carregar,
+        // tempo de o script montar o conteúdo
+        if (html.length > 2000 || (loadedAt && Date.now() - loadedAt > 1200)) finish({ success: true, html, url: win.webContents.getURL(), via: 'browser' });
       } catch {
         /* página ainda carregando */
       }
@@ -91,7 +94,10 @@ function viaBrowser(url: string, timeoutMs = 15000): Promise<FetchHtmlResult> {
     const timer = setTimeout(() => finish({ success: false, error: 'O site demorou demais para responder' }), timeoutMs);
     // Lê a página assim que carregar e de novo a cada 1,5 s (conteúdo montado por JavaScript)
     const poll = setInterval(() => void grab(), 1500);
-    win.webContents.on('did-finish-load', () => setTimeout(() => void grab(), 700));
+    win.webContents.on('did-finish-load', () => {
+      loadedAt = Date.now();
+      setTimeout(() => void grab(), 700);
+    });
     // Site fora do ar / endereço inexistente: falha na hora (sem ler a página de erro do Chromium)
     win.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
       if (isMainFrame && code !== -3) finish({ success: false, error: `${desc || 'falha'} (${code})` });

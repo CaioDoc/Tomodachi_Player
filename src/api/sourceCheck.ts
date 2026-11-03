@@ -80,7 +80,8 @@ export async function checkVideoSource(
   opts: { onStep?: (step: string) => void; signal?: { cancelled: boolean } } = {}
 ): Promise<SourceCheck> {
   const t0 = Date.now();
-  const base = /^https?:\/\//i.test(baseUrl) ? baseUrl : `https://${baseUrl}`;
+  const hasScheme = /^https?:\/\//i.test(baseUrl);
+  let base = hasScheme ? baseUrl : `https://${baseUrl}`;
   const out: SourceCheck = { at: Date.now(), site: 'fail', search: 'skip', episodes: 'skip', video: 'skip', ms: 0 };
   const stop = () => opts.signal?.cancelled || Date.now() - t0 > PROBE_LIMIT_MS;
   const finish = () => {
@@ -92,11 +93,19 @@ export async function checkVideoSource(
   // 1. O site abre?
   opts.onStep?.(t('abrindo o site…'));
   let home: { html: string; url: string } | null = null;
-  try {
-    const res = await window.electronAPI?.siteFetchHtml?.({ url: base });
-    if (res?.success && res.html) home = { html: res.html, url: res.url || base };
-  } catch (err: any) {
-    out.error = String(err?.message || err);
+  // Sem esquema no endereço: tenta https e, se não responder, http (sites antigos e servidores locais)
+  for (const url of hasScheme ? [base] : [`https://${baseUrl}`, `http://${baseUrl}`]) {
+    try {
+      const res = await window.electronAPI?.siteFetchHtml?.({ url });
+      if (res?.success && res.html) {
+        home = { html: res.html, url: res.url || url };
+        base = url;
+        break;
+      }
+      out.error = res?.error || out.error;
+    } catch (err: any) {
+      out.error = String(err?.message || err);
+    }
   }
   if (!home) {
     out.error = out.error || t('O site não respondeu');
