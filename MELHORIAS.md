@@ -700,3 +700,26 @@ O que mudou:
 - O endereço que funcionou fica salvo, e a partir daí as buscas naquele site vão direto pelo caminho certo.
 
 Teste automático novo: um segundo site de mentira que só monta os resultados com JavaScript — o app precisa achar a obra nele e nunca mostrar a página inicial como resultado.
+
+## "Testar": saber se dá para assistir por uma fonte antes de se frustrar (1.10.0-beta)
+
+Toda extensão em **Fontes** ganhou um botão **Testar** — e as da lista "Extensões para instalar" também, para você conferir **antes de instalar**. O teste faz, de verdade, o mesmo caminho que o app faz quando você vai assistir:
+
+1. abre o site (inclusive pelo navegador do app, se ele exigir verificação);
+2. pega uma obra que o próprio site mostra e tenta **buscar por ela**;
+3. lê a **lista de episódios** dessa obra;
+4. tenta **achar o vídeo** do primeiro episódio, igual ao player.
+
+No fim, a fonte fica com um selo:
+
+| Selo | O que significa |
+|---|---|
+| **funciona** | Busca, episódios e vídeo: dá para assistir por ela dentro do app. |
+| **vídeo não abriu** | O app acha a obra e os episódios, mas não conseguiu pegar o vídeo daquela obra (pode ser só dela — vale testar outra pelo Navegar). |
+| **sem episódios** | A busca funciona, mas a lista de episódios não foi reconhecida. |
+| **só navegando** | O site abre, mas a busca do app não traz resultados: dá para usar o Navegar e "Assistir no app". |
+| **não respondeu** | O site não abriu nem pelo navegador do app (fora do ar, bloqueado ou mudou de endereço). |
+
+O selo fica salvo, aparece ao lado do nome da fonte e o detalhe completo (e com qual obra foi testado) fica na dica do selo.
+
+Teste automático novo: o site de teste tem de ser marcado como "funciona" e o site fora do ar como "não respondeu".

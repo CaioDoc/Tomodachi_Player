@@ -255,12 +255,14 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
   };
 
   // 1. Página inicial: o formulário de busca do site e a lista de links dela (para comparação)
-  let home = noFormHosts.has(host) ? null : await getDoc(base).catch(() => null);
+  const home = noFormHosts.has(host) ? null : await getDoc(base).catch(() => null);
+  // Atenção: ler os links da página apaga o cabeçalho (onde fica o formulário), então o formulário
+  // tem de ser lido ANTES
+  let formTpl = home ? findSearchTemplate(home.doc, home.url) : null;
   if (home) {
     reachable = true;
     homeUrls = new Set(extractSiteItems(home.doc, home.url, () => 0).map(keyOf));
   }
-  let formTpl = home ? findSearchTemplate(home.doc, home.url) : null;
 
   // 2. Jeito de buscar já conhecido (ou o formulário do site), com um pedido simples
   const quick = [saved, formTpl].filter(Boolean) as string[];
@@ -287,8 +289,8 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
     if (!formTpl && home) {
       const rendered = await getDoc(base, undefined, true).catch(() => null);
       if (rendered) {
-        homeUrls = new Set(extractSiteItems(rendered.doc, rendered.url, () => 0).map(keyOf));
         formTpl = findSearchTemplate(rendered.doc, rendered.url);
+        homeUrls = new Set(extractSiteItems(rendered.doc, rendered.url, () => 0).map(keyOf));
       }
     }
     // Endereços que esses sites costumam usar, do mais provável para o menos (duas tentativas)

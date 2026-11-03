@@ -41,6 +41,7 @@ import {
   type StremioAddon,
 } from '../api/nuvio';
 import { addAnySource, availableAnimeExtensions, installAnimeExtension, refreshAllVideoSources, removeAnimeExtRepo } from '../api/sources';
+import { CHECK_EVENT, checkSummary, checkVideoSource, readCheck } from '../api/sourceCheck';
 import { getInstalledExtensions, removeExtension, resolveSourceBaseUrl, type InstalledExtension } from '../api/extensionRegistry';
 import { loadRepos } from '../api/reposStore';
 import type { RepoExtension } from '../api/repositories';
@@ -225,6 +226,57 @@ const AddSource: React.FC = () => {
 
 type OpenTabFn = (typeOrTab: any, title?: string, data?: any) => void;
 
+/** Selo "esta fonte funciona?" + botão para testar (mesmo antes de instalar) */
+const SourceCheckBtn: React.FC<{ baseUrl: string; name: string; small?: boolean }> = ({ baseUrl, name, small }) => {
+  const [check, setCheck] = useState(() => readCheck(baseUrl));
+  const [step, setStep] = useState<string | null>(null);
+  useEffect(() => {
+    const on = () => setCheck(readCheck(baseUrl));
+    window.addEventListener(CHECK_EVENT, on);
+    return () => window.removeEventListener(CHECK_EVENT, on);
+  }, [baseUrl]);
+  const run = async () => {
+    if (step) return;
+    setStep(t('abrindo o site…'));
+    try {
+      const r = await checkVideoSource(baseUrl, name, { onStep: setStep });
+      setCheck(r);
+      const s = checkSummary(r);
+      if (s.tone === 'ok') toast.success(t('{name}: funciona', { name }), s.detail);
+      else if (s.tone === 'partial') toast.warning(`${name}: ${s.label}`, s.detail);
+      else toast.error(`${name}: ${s.label}`, s.detail);
+    } finally {
+      setStep(null);
+    }
+  };
+  const sum = check ? checkSummary(check) : null;
+  const tone = sum?.tone === 'ok' ? 'bg-success/15 text-success-fg border-success/30' : sum?.tone === 'partial' ? 'bg-warning/15 text-warning-fg border-warning/30' : 'bg-danger/15 text-danger-fg border-danger/30';
+  return (
+    <span className="inline-flex items-center gap-1.5 shrink-0">
+      {step ? (
+        <span className="text-[11px] text-fg-muted inline-flex items-center gap-1">
+          <Loader2 size={11} className="animate-spin" /> {step}
+        </span>
+      ) : (
+        sum && (
+          <span className={`text-[10.5px] px-1.5 py-0.5 rounded border ${tone}`} title={`${sum.detail}${check?.sample ? ` (${t('testado com')} ${check.sample})` : ''}`}>
+            {sum.label}
+          </span>
+        )
+      )}
+      <button
+        type="button"
+        onClick={run}
+        disabled={!!step}
+        className={`rounded-md border border-line-subtle bg-subtle hover:bg-elevated text-fg inline-flex items-center gap-1 cursor-pointer disabled:opacity-60 ${small ? 'h-7 px-2 text-[11.5px]' : 'h-8 px-2.5 text-[12px]'}`}
+        title={t('Abre o site, busca uma obra e tenta tocar um vídeo — para saber se dá para assistir por esta fonte')}
+      >
+        <ShieldCheck size={small ? 12 : 13} /> {t('Testar')}
+      </button>
+    </span>
+  );
+};
+
 const BrowseBtn: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button
     type="button"
@@ -260,6 +312,7 @@ const ExtensionRow: React.FC<{ ext: InstalledExtension; onBrowse: (ext: Installe
       >
         <Sparkles size={13} /> {t('Obras')}
       </button>
+      {!!domain && <SourceCheckBtn baseUrl={domain} name={ext.name} />}
       {/* Sem site conhecido não há o que navegar: o botão nem aparece */}
       {!!domain && <BrowseBtn onClick={() => onBrowse(ext)} />}
       <IconBtn
@@ -483,6 +536,7 @@ const AvailableExtensions: React.FC<{ installed: InstalledExtension[]; onOpenTab
                     </span>
                     <span className="text-[10.5px] text-fg-muted font-mono">{[site, ext.lang, ext.versionName || ext.version].filter(Boolean).join(' · ')}</span>
                   </span>
+                  {!!site && <SourceCheckBtn baseUrl={site} name={ext.name.replace(/^Aniyomi:\s*/i, '')} small />}
                   {/* Espiar o site antes de instalar */}
                   {!!site && (
                     <button

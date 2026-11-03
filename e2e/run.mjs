@@ -683,6 +683,25 @@ await step('Fontes · Browse abre o site com "Assistir no app"', async () => {
   return 'abriu a página do site com "Assistir no app" e "Episódios no app"';
 });
 
+await step('Fontes · "Testar" diz se dá para assistir por aquela fonte', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Fontes');
+  await sleep(1200);
+  const row = page.locator('div.flex.items-center.gap-3:has(span:text-is("Site Teste"))').first();
+  await row.locator('button:has-text("Testar")').first().click();
+  // O teste abre o site, busca, lê os episódios e tenta achar o vídeo
+  await page.locator('text=/funciona|vídeo não abriu|sem episódios|só navegando|não respondeu/ >> visible=true').first().waitFor({ timeout: 120000 });
+  await sleep(500);
+  await shot(page, 'fontes-testar');
+  const ok = await row.locator('text=funciona').count();
+  const dead = page.locator('div.flex.items-center.gap-3:has(span:text-is("Site Fora do Ar"))').first();
+  await dead.locator('button:has-text("Testar")').first().click();
+  await dead.locator('text=não respondeu').first().waitFor({ timeout: 60000 });
+  await shot(page, 'fontes-testar-fora');
+  if (!ok) throw new Error('o site de teste não foi marcado como "funciona"');
+  return 'site bom marcado como "funciona" e site fora do ar como "não respondeu"';
+});
+
 await step('Fontes · "Obras" mostra o catálogo do site dentro do app', async () => {
   await goSection('Animes & Vídeos');
   await goTab('Fontes');
