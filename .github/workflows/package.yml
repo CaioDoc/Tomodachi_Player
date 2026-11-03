@@ -73,12 +73,24 @@ jobs:
       - name: Publicar o relatório do teste
         if: always()
         shell: bash
+        # O relatório é só informativo: se o envio falhar (408/queda de rede ao subir as imagens),
+        # tenta de novo e, no pior caso, avisa sem derrubar o teste que já passou
         run: |
           mkdir -p e2e-out && cd e2e-out
           git init -q -b r
           git config user.name bot; git config user.email bot@users.noreply.github.com
           git add -A; git commit -q -m r --allow-empty
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" r:e2e-results-dev
+          URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          for i in 1 2 3; do
+            if git push -q -f "$URL" r:e2e-results-dev; then
+              echo "relatório publicado (tentativa $i)"
+              exit 0
+            fi
+            echo "::warning::falha ao publicar o relatório (tentativa $i), tentando de novo"
+            sleep 15
+          done
+          echo "::warning::não deu para publicar o relatório do teste (o resultado do teste em si está no log acima)"
+
       - name: Guardar no rascunho de release
         uses: softprops/action-gh-release@v2
         with:
