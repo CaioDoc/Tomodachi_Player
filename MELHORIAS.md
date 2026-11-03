@@ -688,3 +688,15 @@ As fontes instaladas ficam prontas assim que a janela abre — não é preciso e
 - **A busca recomeçava sozinha** quando a atualização automática das extensões rodava (ela roda poucos segundos depois de abrir o app). Agora o app compara a lista de fontes e, se nada mudou, a busca em andamento continua de onde estava.
 - **A primeira busca em cada site podia demorar demais**: ao aprender como o site busca, o app podia recarregar várias páginas como navegador. Agora é no máximo uma recarga por busca, e com espera menor.
 - **Extensão atualizada** (quando o site muda de endereço) agora limpa na hora a marca de "site fora do ar", em vez de deixá-la valendo por 30 minutos.
+
+## Sites feitos em JavaScript: a busca do app agora acha o mesmo que o navegador (1.9.3-beta)
+
+Em sites como o hanime.tv, **qualquer endereço devolve a mesma página inicial** para um pedido simples — a busca só existe depois que o script do site roda. O app não percebia isso: pegava os cards da página inicial, achava que era o resultado da busca e salvava aquele endereço como "o jeito de buscar daquele site". Por isso a mesma obra aparecia no Browse e não aparecia na busca.
+
+O que mudou:
+
+- O app agora **compara o resultado com a página inicial**. Se vier a mesma coisa, entende que o site ignorou a busca — em vez de mostrar a página inicial como se fosse resultado.
+- Quando isso acontece, ele **abre a busca como navegador** (igual ao Browse), no endereço mais provável (o formulário do site, depois `/search?q=`), e lê os resultados de verdade.
+- O endereço que funcionou fica salvo, e a partir daí as buscas naquele site vão direto pelo caminho certo.
+
+Teste automático novo: um segundo site de mentira que só monta os resultados com JavaScript — o app precisa achar a obra nele e nunca mostrar a página inicial como resultado.

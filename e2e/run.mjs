@@ -71,6 +71,37 @@ http
   .listen(SITE_PORT, '127.0.0.1')
   .unref(); // não segura o teste aberto no fim
 
+// Segundo site de mentira: feito em JavaScript (como hanime.tv). Qualquer endereço devolve a mesma
+// página; os resultados da busca só aparecem depois que o script roda — o app precisa abrir como navegador.
+const JS_PORT = 47813;
+const JS_SITE = `http://127.0.0.1:${JS_PORT}`;
+const jsCard = (slug, title) => `<div class="item"><a href="/videos/${slug}"><img src="/c.jpg" alt=""></a><h3><a href="/videos/${slug}">${title}</a></h3></div>`;
+http
+  .createServer((req, res) => {
+    const u = new URL(req.url || '/', JS_SITE);
+    const send = (body) => {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!doctype html><html><head><title>Site JS</title></head><body>${body}</body></html>`);
+    };
+    const home = `<main id="app">${jsCard('recente-1', 'Recente Um')}${jsCard('recente-2', 'Recente Dois')}${jsCard('recente-3', 'Recente Tres')}</main>`;
+    if (u.pathname === '/search') {
+      const q = (u.searchParams.get('q') || '').toLowerCase();
+      const hits = /tomodachi|js/.test(q) ? jsCard('tomodachi-js', 'Tomodachi JS Dublado') + jsCard('tomodachi-js-2', 'Tomodachi JS 2') : '';
+      // Sem JavaScript o visitante vê a mesma página inicial; com JavaScript, os resultados
+      return send(
+        `<main id="app">${home}</main><script>setTimeout(function(){document.getElementById('app').innerHTML=${JSON.stringify(hits || '<p>Nada</p>')};},300)</script>`
+      );
+    }
+    if (u.pathname.startsWith('/videos/')) {
+      const slug = u.pathname.split('/')[2];
+      const eps = [1, 2].map((n) => `<li><a href="/episodio/${slug}-episodio-${n}">Episódio ${n}</a></li>`).join('');
+      return send(`<main><h1>Tomodachi JS</h1><ul>${eps}</ul></main>`);
+    }
+    return send(home);
+  })
+  .listen(JS_PORT, '127.0.0.1')
+  .unref();
+
 async function launch(tag) {
   const t0 = Date.now();
   const app = await electron.launch({ executablePath: EXE, timeout: 90000 });
@@ -599,6 +630,35 @@ await step('Busca · mostra o que a fonte respondeu quando nada bate com o texto
   if (!shown) throw new Error('não mostrou a obra que o site respondeu');
   if (stillEmpty) throw new Error('o aviso de "nada encontrado" continuou na tela');
   return 'o app avisa que nada bate e, se o usuário pedir, mostra o que a fonte respondeu';
+});
+
+await step('Busca · site feito em JavaScript (resultados só depois do script)', async () => {
+  // Como hanime.tv: o pedido simples devolve sempre a página inicial; a busca só aparece no navegador
+  await page.evaluate((base) => {
+    const list = JSON.parse(localStorage.getItem('installed_extensions') || '[]').filter((e) => e.pkg !== 'test.js');
+    list.push({ pkg: 'test.js', name: 'Site JS', sourceName: 'Site JS', baseUrl: base, type: 'anime', lang: 'en' });
+    localStorage.setItem('installed_extensions', JSON.stringify(list));
+    window.dispatchEvent(new Event('extensions:updated'));
+  }, JS_SITE);
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  await sleep(600);
+  const input = page.locator('input[placeholder*="ex."] >> visible=true').first();
+  await input.fill('Tomodachi JS');
+  await page.locator('section[aria-label="Resultados nas suas fontes"] >> text=Tomodachi JS Dublado').first().waitFor({ timeout: 90000 });
+  await waitSearchDone();
+  await shot(page, 'busca-site-js');
+  const titles = await resultTitles();
+  const leak = titles.filter((x) => /^Recente /.test(x));
+  await input.fill('');
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('installed_extensions') || '[]').filter((e) => e.pkg !== 'test.js');
+    localStorage.setItem('installed_extensions', JSON.stringify(list));
+    window.dispatchEvent(new Event('extensions:updated'));
+  });
+  await sleep(800);
+  if (leak.length) throw new Error('mostrou a página inicial do site como resultado: ' + leak.join(' | '));
+  return `achou "${titles[0]}" num site que só monta a busca com JavaScript`;
 });
 
 await step('Fontes · Browse abre o site com "Assistir no app"', async () => {

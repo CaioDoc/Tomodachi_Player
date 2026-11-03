@@ -217,87 +217,103 @@ export async function searchSite(baseUrl: string, query: string, scorer: Scorer)
   if (!host || !query.trim()) return [];
   const deadAt = deadHosts.get(host);
   if (deadAt && Date.now() - deadAt < DEAD_MS) throw new Error('O site não respondeu');
+  const q = query.trim();
   const saved = readTemplates()[host];
   const tried = new Set<string>();
 
   let best: SiteItem[] = [];
-  let workingTpl: string | null = null;
   let bestTop = 0;
   let reachable = false;
-  // Recarregar como navegador custa alguns segundos: só uma vez por busca
-  let browserLeft = 1;
-  const tryTemplate = async (tpl: string) => {
-    if (tried.has(tpl)) return false;
-    tried.add(tpl);
-    const url = fill(tpl, base, query.trim());
-    let page = await getDoc(url, base);
-    if (!page) return false;
+  /** Links da página inicial: sites feitos em JavaScript devolvem ela para qualquer endereço */
+  let homeUrls: Set<string> | null = null;
+  const keyOf = (it: SiteItem) => it.url.split(/[?#]/)[0];
+  /** A "busca" trouxe o mesmo que a página inicial? Então o site ignorou o que foi pedido */
+  const isHomeAgain = (items: SiteItem[]) => {
+    if (!homeUrls || !homeUrls.size || !items.length) return false;
+    const novos = items.filter((it) => !homeUrls!.has(keyOf(it))).length;
+    return novos / items.length < 0.2;
+  };
+
+  /** Lê uma página de busca; devolve os itens de verdade (ou vazio se o site ignorou a busca) */
+  const resultsOf = async (tpl: string, browser: boolean): Promise<SiteItem[] | null> => {
+    const page = await getDoc(fill(tpl, base, q), base, browser).catch(() => null);
+    if (!page) return null;
     reachable = true;
-    let items = extractSiteItems(page.doc, page.url, scorer);
-    // Sites que montam os resultados com JavaScript devolvem uma página vazia no pedido simples:
-    // carrega de novo como navegador (é o que o usuário vê ao abrir o site)
-    if (items.length === 0 && browserLeft > 0) {
-      browserLeft--;
-      const rendered = await getDoc(url, base, true).catch(() => null);
-      if (rendered) {
-        page = rendered;
-        items = extractSiteItems(rendered.doc, rendered.url, scorer);
-      }
-    }
+    const items = extractSiteItems(page.doc, page.url, scorer);
+    return isHomeAgain(items) ? [] : items;
+  };
+
+  /** Guarda o melhor resultado visto até agora (mesmo sem bater com a busca) */
+  const keep = (items: SiteItem[], tpl: string) => {
     const top = Math.max(0, ...items.map((i) => scorer(i.title)));
-    // Guarda o que o site respondeu mesmo quando nada bate com a busca: quem chamou decide o que
-    // mostrar (é o mesmo resultado que a pessoa veria abrindo o site)
-    if (top > bestTop || best.length === 0) {
+    if (top > bestTop || (best.length === 0 && items.length > 0)) {
       best = items;
       bestTop = top;
     }
-    if (top >= 0.5) {
-      if (saved !== tpl) saveTemplate(host, tpl);
-      return true;
-    }
-    // Página de resultados de verdade (com obras), só não tinha esta: este é o jeito de buscar do site
-    if (items.length >= 2 && !saved) workingTpl = workingTpl || tpl;
-    return false;
+    if (items.length) saveTemplate(host, tpl);
+    return top >= 0.5;
   };
 
-  // Jeito de buscar já conhecido: usa ele primeiro. Se não vier nada (o site mudou, ou o endereço
-  // guardado não é mesmo o da busca), procura o formulário de novo em vez de desistir
-  if (saved) {
-    await tryTemplate(saved);
-    if (best.length) return best;
-    saveTemplate(host, null);
-  }
-  // Formulário de busca da página inicial (o jeito "oficial" do site): guarda mesmo sem achar a obra
-  let home = noFormHosts.has(host) ? null : await getDoc(base);
-  // Página inicial montada por JavaScript: o formulário de busca só existe depois de carregar
-  if (home && browserLeft > 0 && !findSearchTemplate(home.doc, home.url)) {
-    browserLeft--;
-    home = (await getDoc(base, undefined, true).catch(() => null)) || home;
-  }
+  // 1. Página inicial: o formulário de busca do site e a lista de links dela (para comparação)
+  let home = noFormHosts.has(host) ? null : await getDoc(base).catch(() => null);
   if (home) {
     reachable = true;
-    const tpl = findSearchTemplate(home.doc, home.url);
-    if (tpl) {
-      // O site tem busca própria: o resultado dela é a resposta (não precisa tentar outros endereços)
-      await tryTemplate(tpl);
-      saveTemplate(host, tpl);
-      return best;
+    homeUrls = new Set(extractSiteItems(home.doc, home.url, () => 0).map(keyOf));
+  }
+  let formTpl = home ? findSearchTemplate(home.doc, home.url) : null;
+
+  // 2. Jeito de buscar já conhecido (ou o formulário do site), com um pedido simples
+  const quick = [saved, formTpl].filter(Boolean) as string[];
+  for (const tpl of quick) {
+    if (tried.has(tpl)) continue;
+    tried.add(tpl);
+    const items = await resultsOf(tpl, false);
+    if (items?.length && keep(items, tpl)) return best;
+  }
+
+  // 3. Endereços de busca mais comuns (ainda sem abrir navegador)
+  const fallbacks = FALLBACK_TEMPLATES.slice(0, noFormHosts.has(host) ? 2 : 6);
+  for (const tpl of fallbacks) {
+    if (tried.has(tpl)) continue;
+    tried.add(tpl);
+    const items = await resultsOf(tpl, false);
+    if (items?.length && keep(items, tpl)) return best;
+  }
+
+  // 4. Nada: o site provavelmente monta a busca com JavaScript (como o usuário vê no navegador).
+  //    Abre UMA vez, no endereço mais promissor, e lê o que aparecer.
+  if (!best.length && reachable) {
+    // A página inicial também pode precisar do navegador para mostrar o formulário de busca
+    if (!formTpl && home) {
+      const rendered = await getDoc(base, undefined, true).catch(() => null);
+      if (rendered) {
+        homeUrls = new Set(extractSiteItems(rendered.doc, rendered.url, () => 0).map(keyOf));
+        formTpl = findSearchTemplate(rendered.doc, rendered.url);
+      }
+    }
+    // Endereços que esses sites costumam usar, do mais provável para o menos (duas tentativas)
+    const candidates = [formTpl, saved, 'search?q={q}', '?s={q}', 'search?keyword={q}'].filter(Boolean) as string[];
+    const seen = new Set<string>();
+    let renders = 2;
+    for (const tpl of candidates) {
+      if (renders <= 0) break;
+      if (seen.has(tpl)) continue;
+      seen.add(tpl);
+      renders--;
+      const items = await resultsOf(tpl, true);
+      if (items?.length) {
+        keep(items, tpl);
+        return best;
+      }
     }
   }
-  for (const tpl of FALLBACK_TEMPLATES.slice(0, noFormHosts.has(host) ? 1 : 5)) {
-    if (await tryTemplate(tpl)) return best;
-    if (workingTpl) {
-      saveTemplate(host, workingTpl);
-      return best;
-    }
-  }
-  // Fora do ar: pula este site por um tempo. Sem formulário e sem resultado: nas próximas buscas
-  // tenta só o endereço mais comum (1 pedido em vez de 6)
+
+  // Fora do ar: pula este site por um tempo. Alcançável mas sem busca: nas próximas vezes tenta menos
   if (!reachable) {
     deadHosts.set(host, Date.now());
     throw new Error('O site não respondeu');
   }
-  noFormHosts.add(host);
+  if (!best.length) noFormHosts.add(host);
   return best;
 }
 
