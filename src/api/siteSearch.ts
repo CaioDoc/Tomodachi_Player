@@ -47,7 +47,7 @@ function saveTemplate(host: string, tpl: string | null) {
   }
 }
 
-async function getDoc(url: string, referer?: string, browser = false): Promise<{ doc: Document; url: string } | null> {
+export async function getDoc(url: string, referer?: string, browser = false): Promise<{ doc: Document; url: string } | null> {
   const api = window.electronAPI;
   if (!api?.siteFetchHtml) return null;
   const res = await api.siteFetchHtml({ url, referer, browser });

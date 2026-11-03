@@ -723,3 +723,14 @@ No fim, a fonte fica com um selo:
 O selo fica salvo, aparece ao lado do nome da fonte e o detalhe completo (e com qual obra foi testado) fica na dica do selo.
 
 Teste automático novo: o site de teste tem de ser marcado como "funciona" e o site fora do ar como "não respondeu".
+
+## O Descobrir vira a biblioteca do site: catálogo inteiro, com páginas (1.11.0-beta)
+
+Escolhendo uma extensão no seletor do **Descobrir**, o app agora mostra o catálogo do site como uma biblioteca:
+
+- **Acha a lista completa do site.** Em vez de ler só a página inicial (que costuma ter meia dúzia de lançamentos), o app procura no menu o link da listagem — "Animes", "Catálogo", "Todos", "Lançamentos"… — e usa a página que tiver mais obras. A escolha fica salva por site.
+- **Páginas de verdade, em qualquer extensão.** O app lê a paginação do próprio site (`rel="next"`, os números, as setas, `/page/2/`, `?page=2`) e mostra **‹ Página N ›** ao lado do título. Dá para ir e voltar sem perder o lugar.
+- **Lê muito mais obras por página.** O leitor antigo dependia de um padrão de HTML rígido (e exigia `alt` na imagem), então em vários sites trazia poucos cards. Agora usa o mesmo leitor da busca, que entende o HTML de verdade — inclusive capas que carregam depois.
+- **Sites feitos em JavaScript** também entram: se a lista vier curta no pedido simples, o app carrega a página como navegador e lê o que aparece.
+
+Teste automático novo: o site de teste ganhou uma listagem paginada; o app precisa abrir a lista completa (e não a página inicial), virar para a página 2 e voltar.

@@ -29,8 +29,20 @@ http
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!doctype html><html><head><title>Animes Teste</title></head><body>${body}</body></html>`);
     };
-    const nav = '<header><nav><a href="/">Início</a><a href="/generos/acao">Ação</a><a href="/lancamentos">Lançamentos</a></nav><form class="search-form" action="/pesquisar" method="get"><input type="text" name="busca" placeholder="Pesquisar anime..."></form></header>';
+    const nav =
+      '<header><nav><a href="/">Início</a><a href="/animes/">Animes</a><a href="/generos/acao">Ação</a><a href="/login">Entrar</a></nav><form class="search-form" action="/pesquisar" method="get"><input type="text" name="busca" placeholder="Pesquisar anime..."></form></header>';
+    // Lista completa do site, paginada (é o que o Descobrir mostra ao escolher esta fonte)
+    const listCard = (n) => `<div class="item"><a href="/anime/obra-${n}"><img src="/capa/${n}.jpg" alt=""></a><h3 class="title"><a href="/anime/obra-${n}">Obra ${n}</a></h3></div>`;
+    const listPage = (p) => {
+      const items = Array.from({ length: 6 }, (_, i) => listCard((p - 1) * 6 + i + 1)).join('');
+      const pag = `<div class="pagination">${p > 1 ? `<a href="/animes/page/${p - 1}/">Anterior</a>` : ''}<span class="current">${p}</span>${p < 3 ? `<a href="/animes/page/${p + 1}/">${p + 1}</a><a href="/animes/page/${p + 1}/">»</a>` : ''}</div>`;
+      return `<main class="lista">${items}</main>${pag}`;
+    };
     if (u.pathname === '/') return html(nav + '<main><div class="item"><a href="/anime/outro"><img src="/x.jpg" alt="Outro Anime"></a></div></main>');
+    {
+      const m = u.pathname.match(/^\/animes\/(?:page\/(\d+)\/?)?$/);
+      if (m) return html(nav + listPage(Number(m[1] || 1)));
+    }
     if (u.pathname === '/pesquisar') {
       const q = (u.searchParams.get('busca') || '').toLowerCase();
       const card = (slug, title) => `<div class="item"><a href="/anime/${slug}"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-src="/capa/${slug}.jpg" alt=""></a><h3 class="title"><a href="/anime/${slug}">${title}</a></h3></div>`;
@@ -681,6 +693,32 @@ await step('Fontes · Browse abre o site com "Assistir no app"', async () => {
   if (!webviews) throw new Error('Browse não mostrou a página do site');
   if (!watchBtn || !epsBtn) throw new Error('faltam os botões para assistir no app');
   return 'abriu a página do site com "Assistir no app" e "Episódios no app"';
+});
+
+await step('Descobrir · catálogo da fonte com páginas que funcionam', async () => {
+  await goSection('Animes & Vídeos');
+  await goTab('Descobrir');
+  await sleep(600);
+  const sel = page.locator('select[aria-label="Onde buscar"] >> visible=true').first();
+  await sel.selectOption('site:test.site');
+  // A lista completa do site (/animes/) tem mais obras que a página inicial: é ela que deve abrir
+  await page.locator('text=Obra 6 >> visible=true').first().waitFor({ timeout: 60000 });
+  await sleep(500);
+  await shot(page, 'descobrir-catalogo-pagina-1');
+  const page1 = await page.locator('h4:visible, div.group:visible').count();
+  const next = page.locator('button[aria-label="Próxima página"] >> visible=true').first();
+  if (!(await next.count())) throw new Error('o catálogo da fonte não tem paginação');
+  await next.click();
+  await page.locator('text=Obra 7 >> visible=true').first().waitFor({ timeout: 60000 });
+  await sleep(500);
+  await shot(page, 'descobrir-catalogo-pagina-2');
+  const onPage2 = await page.locator('text=Página 2 >> visible=true').count();
+  await page.locator('button[aria-label="Página anterior"] >> visible=true').first().click();
+  await page.locator('text=Obra 1 >> visible=true').first().waitFor({ timeout: 60000 });
+  await sel.selectOption('all');
+  await sleep(1200);
+  if (!onPage2) throw new Error('não mudou para a página 2');
+  return `catálogo do site com páginas (1ª com ${page1} blocos, 2ª abriu e voltou)`;
 });
 
 await step('Fontes · "Testar" diz se dá para assistir por aquela fonte', async () => {

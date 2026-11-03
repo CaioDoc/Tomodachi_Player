@@ -1,8 +1,11 @@
 // src/components/ExtensionCatalogView.tsx
 import { searchSite } from '../api/siteSearch';
+import { siteCatalogPage } from '../api/siteCatalog';
 import { relevance, MIN_RELEVANCE } from '../utils/relevance';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
+  ChevronLeft,
+  ChevronRight,
   Compass,
   Search,
   BookOpen,
@@ -206,11 +209,16 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
   /** A busca no site respondeu, mas nenhum título bate com o que foi digitado */
   const [weakSearch, setWeakSearch] = useState(false);
   const [catalogPage, setCatalogPage] = useState<number>(1);
+  /** Endereço de cada página do catálogo do site (a próxima sai da paginação do próprio site) */
+  const [pageUrls, setPageUrls] = useState<string[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState<number>(0);
 
   // Reseta a página do catálogo quando trocar de extensão
   useEffect(() => {
     setCatalogPage(1);
+    setPageUrls([]);
+    setHasNextPage(false);
   }, [extName]);
 
   useEffect(() => {
@@ -569,12 +577,22 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                   return { success: true, items: list.map((it) => ({ title: it.title, url: it.url, cover: it.cover || '' })) };
                 })
                 .catch(() => ({ success: false, items: [] }))
-            : window.electronAPI.scrapeExtensionCatalog({
-                baseUrl: rawDomain || targetWebUrl,
-                query: debouncedQuery,
-                page: targetPage,
-                sourceName: extName,
-              });
+            : // Sem busca: o catálogo do próprio site, página por página (como uma biblioteca)
+              siteCatalogPage(rawDomain || targetWebUrl, pageUrls[catalogPage - 1] || '', catalogPage)
+                .then((pg) => {
+                  if (!isCancelled) {
+                    setPageUrls((prev) => {
+                      const next = [...prev];
+                      next[catalogPage - 1] = pg.url;
+                      if (pg.next) next[catalogPage] = pg.next;
+                      else next.length = catalogPage;
+                      return next;
+                    });
+                    setHasNextPage(!!pg.next);
+                  }
+                  return { success: true, items: pg.items.map((it) => ({ title: it.title, url: it.url, cover: it.cover || '' })) };
+                })
+                .catch(() => ({ success: false, items: [] }));
         job
           .then((res) => {
             if (isCancelled) return;
@@ -1099,6 +1117,35 @@ export const ExtensionCatalogView: React.FC<ExtensionCatalogViewProps> = ({
                   )}
 
                   {loading && <Loader2 size={16} className="animate-spin text-accent" />}
+
+                  {/* Páginas do catálogo do site (a próxima vem da paginação do próprio site) */}
+                  {!debouncedQuery && (catalogPage > 1 || hasNextPage) && (
+                    <div className="inline-flex items-center gap-1 rounded-lg border border-line bg-surface p-0.5">
+                      <button
+                        type="button"
+                        disabled={catalogPage <= 1 || loading}
+                        onClick={() => setCatalogPage((n) => Math.max(1, n - 1))}
+                        className="h-7 px-2 rounded-md text-fg-2 hover:text-fg hover:bg-subtle disabled:opacity-40 disabled:cursor-default cursor-pointer inline-flex items-center"
+                        aria-label={t('Página anterior')}
+                        title={t('Página anterior')}
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span className="px-1.5 text-[12px] text-fg tabular-nums" aria-live="polite">
+                        {t('Página {n}', { n: catalogPage })}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={!hasNextPage || loading}
+                        onClick={() => setCatalogPage((n) => n + 1)}
+                        className="h-7 px-2 rounded-md text-fg-2 hover:text-fg hover:bg-subtle disabled:opacity-40 disabled:cursor-default cursor-pointer inline-flex items-center"
+                        aria-label={t('Próxima página')}
+                        title={t('Próxima página')}
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
