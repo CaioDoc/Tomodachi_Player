@@ -1,0 +1,363 @@
+{
+  "results": [
+    {
+      "name": "Abrir o app",
+      "ok": true,
+      "ms": 2325,
+      "note": "primeira tela em 2.3s"
+    },
+    {
+      "name": "Tela de boas-vindas",
+      "ok": true,
+      "ms": 1461,
+      "note": "aparece e leva ao Descobrir"
+    },
+    {
+      "name": "Descobrir · Animes (AniList)",
+      "ok": true,
+      "ms": 3516,
+      "note": "24 animes carregados"
+    },
+    {
+      "name": "Descobrir · Séries (Cinemeta)",
+      "ok": true,
+      "ms": 3500,
+      "note": "50 séries carregadas"
+    },
+    {
+      "name": "Descobrir · Filmes (Cinemeta)",
+      "ok": true,
+      "ms": 2976,
+      "note": "50 filmes carregados"
+    },
+    {
+      "name": "Busca sem fontes instaladas pede para adicionar fontes",
+      "ok": true,
+      "ms": 3507,
+      "note": "aviso único, nenhuma obra de fora das fontes"
+    },
+    {
+      "name": "Página da obra (série)",
+      "ok": true,
+      "ms": 2868,
+      "note": "abriu com temporadas (10 episódios na lista)"
+    },
+    {
+      "name": "Talvez você goste (série)",
+      "ok": true,
+      "ms": 2687,
+      "note": "19 sugestões (Mesma franquia, Parecido)"
+    },
+    {
+      "name": "Tags clicáveis (série → Descobrir)",
+      "ok": true,
+      "ms": 4291,
+      "note": "tag \"Crime\" abriu o Descobrir buscando por ela"
+    },
+    {
+      "name": "Navegar por tag no Descobrir (Seinen)",
+      "ok": true,
+      "ms": 8644,
+      "note": "Buscando por Tag Seinen Separe por vírgula para combinar → 24 animes"
+    },
+    {
+      "name": "Página de anime + Talvez você goste (AniList)",
+      "ok": true,
+      "ms": 7286,
+      "note": "21 sugestões; 1ª: Recomendado / 7.9; 13 tags: Adventure, Comedy, Fantasy, Slice of Life, Surreal Comedy, Found Family, Slapstick, Urban Fantasy"
+    },
+    {
+      "name": "Onde assistir (sem fontes instaladas)",
+      "ok": true,
+      "ms": 3751,
+      "note": "painel abre e explica como adicionar fontes"
+    },
+    {
+      "name": "Favoritar em lote",
+      "ok": true,
+      "ms": 7763,
+      "note": "biblioteca: Biblioteca 2"
+    },
+    {
+      "name": "Biblioteca · busca por tags e sem aba Favoritos",
+      "ok": true,
+      "ms": 770,
+      "note": "aba Favoritos: removida; 2 tags sugeridas; filtrando por \"Mystery\": Mystery"
+    },
+    {
+      "name": "Biblioteca · botão de assistir na capa",
+      "ok": true,
+      "ms": 3149,
+      "note": "a capa tem o botão de assistir (continua de onde parou)"
+    },
+    {
+      "name": "Fontes · instalar addon (Anime Kitsu, só catálogo)",
+      "ok": true,
+      "ms": 1902,
+      "note": "instalado"
+    },
+    {
+      "name": "Descobrir · busca também nas fontes instaladas",
+      "ok": true,
+      "ms": 4430,
+      "note": "3 obras: Cowboy Bebop | Cowboy Bebop: Yose Atsume Blues | Cowboy Bebop: Ein no Natsuyasumi"
+    },
+    {
+      "name": "Doar presente na Biblioteca de Mangás",
+      "ok": true,
+      "ms": 2087,
+      "note": "aparece"
+    },
+    {
+      "name": "Fontes · Navegar no catálogo do addon",
+      "ok": true,
+      "ms": 7178,
+      "note": "51 capas"
+    },
+    {
+      "name": "Fontes · addon só de links (Torrentio) entra na busca",
+      "ok": true,
+      "ms": 8251,
+      "note": "5 obras, na ordem: Breaking Bad | Breaking Bad Wolf | Breaking Bad: Original Minisodes | Untitled Korean remake of Breaking Bad | No Half Measures: Creating the Final Season of Breaking Bad; sem botão Navegar (só links)"
+    },
+    {
+      "name": "Descobrir · nada encontrado mostra um aviso só",
+      "ok": true,
+      "ms": 9315,
+      "note": "aviso único com sugestões"
+    },
+    {
+      "name": "MyAnimeList · resposta da busca (sem chave)",
+      "ok": true,
+      "ms": 138,
+      "note": "success=true via=site itens=5 erro=- 1º=Fullmetal Alchemist: Brotherhood"
+    },
+    {
+      "name": "Descobrir · relevância e nota do MyAnimeList",
+      "ok": true,
+      "ms": 13938,
+      "note": "16 obras (22 com nota do MAL): Fullmetal Alchemist | Fullmetal Alchemist: Brotherhood | Fullmetal Alchemist | Fullmetal Alchemist: Brotherhood: 4-Koma Theater"
+    },
+    {
+      "name": "Assistir · nunca mostra o site: acha o vídeo ou avisa",
+      "ok": true,
+      "ms": 25958,
+      "note": "sem vídeo → avisa (O site não entregou o vídeo); mp4 → https://www.w3schools.com/html/mov_bbb.mp4; hls → https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
+    },
+    {
+      "name": "Extensão (site) · acha a obra pela busca do site e toca o episódio no player do app",
+      "ok": true,
+      "ms": 17239,
+      "note": "2 sites com liga/desliga; episódios 1,2,3; tocou em 3.9s pelo player do app (http://127.0.0.1:47811/media/sample.mp4)"
+    },
+    {
+      "name": "Extensão · \"Assistir\" toca o episódio na hora (sem passar pelo painel)",
+      "ok": true,
+      "ms": 10587,
+      "note": "tocou em 1.6s direto do botão \"Assistir: Episódio 1\" (sem painel)"
+    },
+    {
+      "name": "Busca · mostra o que a fonte respondeu quando nada bate com o texto",
+      "ok": true,
+      "ms": 7356,
+      "note": "o app avisa que nada bate e, se o usuário pedir, mostra o que a fonte respondeu"
+    },
+    {
+      "name": "Busca · site feito em JavaScript (resultados só depois do script)",
+      "ok": true,
+      "ms": 8141,
+      "note": "achou \"Tomodachi JS 2\" num site que só monta a busca com JavaScript"
+    },
+    {
+      "name": "Fontes · Browse abre o site com \"Assistir no app\"",
+      "ok": true,
+      "ms": 6107,
+      "note": "abriu a página do site com \"Assistir no app\" e \"Episódios no app\""
+    },
+    {
+      "name": "Descobrir · catálogo da fonte com páginas que funcionam",
+      "ok": true,
+      "ms": 4867,
+      "note": "catálogo do site com páginas (1ª com 17 blocos, 2ª abriu e voltou)"
+    },
+    {
+      "name": "Fontes · \"Testar\" diz se dá para assistir por aquela fonte",
+      "ok": true,
+      "ms": 6786,
+      "note": "site bom marcado como \"funciona\" e site fora do ar como \"não respondeu\""
+    },
+    {
+      "name": "Fontes · \"Obras\" mostra o catálogo do site dentro do app",
+      "ok": true,
+      "ms": 7448,
+      "note": "catálogo aberto no app (1 capas, 12 blocos) com o botão para abrir o site"
+    },
+    {
+      "name": "Descobrir · seletor de onde buscar (uma fonte ou todas)",
+      "ok": true,
+      "ms": 13127,
+      "note": "8 opções (Todas as fontes, Site Teste, Site Fora do Ar…); busca dentro da fonte achou a obra"
+    },
+    {
+      "name": "Configurações · cartão do MyAnimeList",
+      "ok": true,
+      "ms": 3949,
+      "note": "cartão, interruptor e aviso do Client Secret"
+    },
+    {
+      "name": "Mangás · Explorar MangaDex",
+      "ok": true,
+      "ms": 11673,
+      "note": "o MangaDex não respondeu neste runner (sem capas) — etapas do MangaDex puladas"
+    },
+    {
+      "name": "Mangás · detalhe e leitura (MangaDex)",
+      "ok": true,
+      "ms": 0,
+      "note": "pulado (o MangaDex não respondeu)"
+    },
+    {
+      "name": "Mangás · Talvez você goste (MangaDex)",
+      "ok": true,
+      "ms": 0,
+      "note": "pulado (o MangaDex não respondeu)"
+    },
+    {
+      "name": "Modo anônimo · ligar (Animes & Vídeos e Mangás)",
+      "ok": true,
+      "ms": 2098,
+      "note": "ligado (aparece nas duas seções)"
+    },
+    {
+      "name": "Vídeo local · adicionar pasta e tocar",
+      "ok": true,
+      "ms": 7039,
+      "note": "tocando: 5.0s de 20.0s (pausado=false)"
+    },
+    {
+      "name": "Modo anônimo · nada do que foi assistido ficou salvo",
+      "ok": true,
+      "ms": 5271,
+      "note": "nada salvo (selo no player: sim); modo desligado de novo"
+    },
+    {
+      "name": "Formatos · MKV, AVI e MP4 com áudio AC3 tocam no player",
+      "ok": true,
+      "ms": 22033,
+      "note": "fmt-mkv: tocou em 4.2s (media); fmt-avi: tocou em 4.5s (media); fmt-ac3: tocou em 4.4s (media)"
+    },
+    {
+      "name": "Navegador integrado",
+      "ok": true,
+      "ms": 7712,
+      "note": "abriu nova aba e carregou example.com"
+    },
+    {
+      "name": "Abas · arrastar para reordenar",
+      "ok": true,
+      "ms": 872,
+      "note": "Mangás & Comics | Configurações | Tomodachi Teste Dublado | KONOSUBA -God's blessing on this wonderful world! | Nocturne | Animes & Vídeos | Example Domain  →  Animes & Vídeos | Mangás & Comics | Configurações | Tomodachi Teste Dublado | KONOSUBA -God's blessing on this wonderful world! | Nocturne | Example Domain"
+    },
+    {
+      "name": "Busca global (Ctrl+K)",
+      "ok": true,
+      "ms": 1368,
+      "note": "abre e filtra"
+    },
+    {
+      "name": "Configurações · banner e abas",
+      "ok": true,
+      "ms": 6358,
+      "note": "todas as abas abriram"
+    },
+    {
+      "name": "Botão Doar abre o Ko-fi",
+      "ok": true,
+      "ms": 2291,
+      "note": "https://ko-fi.com/tomodachiplayer"
+    },
+    {
+      "name": "Memória (todos os processos)",
+      "ok": true,
+      "ms": 0,
+      "note": "750 MB"
+    },
+    {
+      "name": "Reabrir · sessão e biblioteca mantidas",
+      "ok": true,
+      "ms": 5629,
+      "note": "7 abas restauradas; Biblioteca 2; abriu em 1.2s"
+    },
+    {
+      "name": "Idioma · English",
+      "ok": true,
+      "ms": 7228,
+      "note": "interface trocou para inglês"
+    }
+  ],
+  "consoleErrors": [
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run1] Failed to load resource: the server responded with a status of 403 ()",
+    "[run1] Failed to load resource: the server responded with a status of 403 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run1] Failed to load resource: the server responded with a status of 404 ()",
+    "[run2] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run2] Failed to load resource: the server responded with a status of 403 ()",
+    "[run2] Failed to load resource: the server responded with a status of 404 ()",
+    "[run2] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[run2] Failed to load resource: the server responded with a status of 403 ()",
+    "[run2] Failed to load resource: the server responded with a status of 404 ()"
+  ]
+}

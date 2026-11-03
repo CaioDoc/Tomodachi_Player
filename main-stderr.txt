@@ -1,0 +1,6 @@
+(node:7772) electron: Failed to load URL: http://127.0.0.1:47899/ with error: ERR_CONNECTION_REFUSED
+(Use `Tomodachi Player --trace-warnings ...` to show where the warning was created)
+Debugger ending on ws://127.0.0.1:55097/dc6e8098-2872-45cf-aab1-44eb74e68e85
+For help, see: https://nodejs.org/en/docs/inspector
+Debugger ending on ws://127.0.0.1:55388/f0f48531-15c8-4594-afc8-17e9c5fed087
+For help, see: https://nodejs.org/en/docs/inspector
